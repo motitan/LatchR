@@ -1,0 +1,3610 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LatchR</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vis-timeline@7.7.3/styles/vis-timeline-graph2d.min.css" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0b0d10;
+      --s1: #12151a;
+      --s2: #1a1e26;
+      --s3: #22283380;
+      --bdr: #2a3040;
+      --bdr2: #3a4455;
+      --txt: #d8dde8;
+      --mute: #5a677e;
+      --acc: #00e5ff;
+      --acc2: #ff3d6e;
+      --acc3: #ffd166;
+      --mono: 'Courier New', Consolas, monospace;
+      --cond: 'Arial Narrow', Arial, sans-serif;
+      --ui: 'Segoe UI', system-ui, sans-serif;
+      --BAR: 40px;
+      --TH: 200px;
+      --TS: 8px;
+      --RW: 320px;
+    }
+
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--txt);
+      font-family: var(--ui);
+      font-size: 13px;
+    }
+
+    html.col-resize,
+    body.col-resize {
+      cursor: col-resize;
+      user-select: none;
+    }
+
+    html.row-resize,
+    body.row-resize {
+      cursor: row-resize;
+      user-select: none;
+    }
+
+    /* ── TOPBAR ─────────────────────────────────────────── */
+    #bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--BAR);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 10px;
+      background: var(--s1);
+      border-bottom: 1px solid var(--bdr);
+      z-index: 20;
+      overflow: hidden;
+    }
+
+    .logo {
+      font-family: var(--cond);
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: var(--acc);
+      margin-right: 4px;
+    }
+
+    .vr {
+      width: 1px;
+      height: 20px;
+      background: var(--bdr);
+      flex-shrink: 0;
+    }
+
+    .btn {
+      font-family: var(--cond);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 3px;
+      border: 1px solid var(--bdr2);
+      background: var(--s2);
+      color: var(--txt);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color .12s, color .12s;
+      flex-shrink: 0;
+    }
+
+    .btn:hover {
+      border-color: var(--acc);
+      color: var(--acc);
+    }
+
+    .btn.pri {
+      border-color: var(--acc);
+      color: var(--acc);
+    }
+
+    .btn.lck {
+      border-color: var(--acc2);
+      color: var(--acc2);
+    }
+
+    .btn.on {
+      border-color: var(--acc);
+      color: var(--acc);
+    }
+
+    .txt {
+      background: var(--s2);
+      border: 1px solid var(--bdr);
+      color: var(--txt);
+      border-radius: 3px;
+      padding: 3px 7px;
+      font-family: var(--mono);
+      font-size: 10px;
+    }
+
+    .txt:focus {
+      outline: none;
+      border-color: var(--acc);
+    }
+
+    .txt[readonly] {
+      opacity: 0.75;
+      cursor: default;
+    }
+
+    .fbtn {
+      position: relative;
+    }
+
+    .fbtn input[type=file] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    #bar-grow {
+      flex: 1 1 auto;
+      min-width: 20px;
+    }
+
+    #st {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--mute);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1 1 240px;
+      min-width: 160px;
+      text-align: right;
+    }
+
+    #proj-info {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--mute);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 260px;
+      flex: 0 1 260px;
+    }
+
+    #st.ok {
+      color: var(--acc);
+    }
+
+    #st.err {
+      color: var(--acc2);
+    }
+
+    #toolbar-dd {
+      position: fixed;
+      top: calc(var(--BAR) + 5px);
+      right: 10px;
+      z-index: 50;
+      display: none;
+      width: min(980px, calc(100vw - 20px));
+      border: 1px solid var(--bdr2);
+      border-radius: 6px;
+      background: #10151f;
+      box-shadow: 0 8px 24px #000a;
+      padding: 10px;
+    }
+
+    #toolbar-dd.on {
+      display: block;
+    }
+
+    #toolbar-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(240px, 1fr));
+      gap: 8px;
+    }
+
+    .tool-card {
+      border: 1px solid var(--bdr);
+      background: var(--s1);
+      border-radius: 4px;
+      padding: 8px;
+    }
+
+    .tool-title {
+      font-family: var(--cond);
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: var(--mute);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .tool-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .tool-row .txt {
+      flex: 1 1 190px;
+      min-width: 180px;
+    }
+
+    .tool-row .btn {
+      flex-shrink: 0;
+    }
+
+    /* ── ROOT LAYOUT ─────────────────────────────────────
+   Fixed topbar + flex column below it.
+   Main row grows, timeline row is fixed height.        */
+    #root {
+      position: fixed;
+      top: var(--BAR);
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #main {
+      flex: 1 1 0;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 8px minmax(220px, var(--RW));
+    }
+
+    #tl-row {
+      flex: 0 0 var(--TH);
+      min-height: 120px;
+      border-top: 1px solid var(--bdr);
+      display: flex;
+      flex-direction: column;
+    }
+
+    #tl-splitter {
+      flex: 0 0 var(--TS);
+      height: var(--TS);
+      background: var(--s1);
+      border-top: 1px solid var(--bdr);
+      border-bottom: 1px solid var(--bdr);
+      cursor: row-resize;
+      position: relative;
+    }
+
+    #tl-splitter::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 46px;
+      height: 2px;
+      border-radius: 999px;
+      background: var(--bdr2);
+      transform: translate(-50%, -50%);
+    }
+
+    #tl-splitter:hover::after {
+      background: var(--acc);
+    }
+
+    #tl-splitter.drag {
+      background: #1f2633;
+    }
+
+    /* ── LEFT COLUMN ─────────────────────────────────────
+   Key fix: padding-top % trick for 16:9 video.
+   This is purely CSS-driven — no JS sizing needed.     */
+    #left {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* The padding-top % is relative to the ELEMENT'S OWN WIDTH.
+   56.25% = 9/16 * 100. We cap with max-height via a min() trick. */
+    #vwrap {
+      position: relative;
+      width: 100%;
+      /* Create intrinsic 16:9 aspect ratio */
+      padding-top: min(56.25%, 42vh);
+      background: #000;
+      flex-shrink: 0;
+    }
+
+    #vwrap video {
+      /* Absolutely fill the padding-top box */
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+      background: #000;
+    }
+
+    /* Controls strip */
+    #vctrl {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+      padding: 5px 8px;
+      background: var(--s1);
+      border-bottom: 1px solid var(--bdr);
+    }
+
+    #vtime {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--acc);
+      min-width: 64px;
+    }
+
+    .sk {
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 3px 7px;
+      border-radius: 3px;
+      border: 1px solid var(--bdr);
+      background: var(--s2);
+      color: var(--mute);
+      cursor: pointer;
+    }
+
+    .sk:hover {
+      color: var(--txt);
+    }
+
+    #spd {
+      background: var(--s2);
+      border: 1px solid var(--bdr);
+      color: var(--txt);
+      border-radius: 3px;
+      padding: 2px 5px;
+      font-family: var(--mono);
+      font-size: 10px;
+      cursor: pointer;
+    }
+
+    /* Event table */
+    #etbl-wrap {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--bdr2) transparent;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--s2);
+      font-family: var(--cond);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--mute);
+      padding: 5px 7px;
+      text-align: left;
+      border-bottom: 1px solid var(--bdr);
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--bdr);
+      cursor: pointer;
+    }
+
+    tbody tr:hover {
+      background: var(--s3);
+    }
+
+    tbody tr.sel {
+      background: #00e5ff10;
+    }
+
+    tbody td {
+      padding: 4px 7px;
+      font-family: var(--mono);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    .chk {
+      appearance: none;
+      width: 13px;
+      height: 13px;
+      border: 1px solid var(--bdr2);
+      border-radius: 2px;
+      background: var(--s2);
+      cursor: pointer;
+      position: relative;
+    }
+
+    .chk:checked {
+      background: var(--acc);
+      border-color: var(--acc);
+    }
+
+    .chk:checked::after {
+      content: '✓';
+      position: absolute;
+      top: -1px;
+      left: 1px;
+      font-size: 9px;
+      color: #000;
+    }
+
+    /* ── RIGHT COLUMN ────────────────────────────────────── */
+    #right {
+      grid-column: 3;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--bdr);
+      overflow: hidden;
+    }
+
+    #splitter {
+      grid-column: 2;
+      background: var(--s1);
+      border-left: 1px solid var(--bdr);
+      border-right: 1px solid var(--bdr);
+      cursor: col-resize;
+      position: relative;
+    }
+
+    #splitter::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 2px;
+      height: 28px;
+      transform: translate(-50%, -50%);
+      background: var(--bdr2);
+      border-radius: 2px;
+    }
+
+    #splitter:hover::after {
+      background: var(--acc);
+    }
+
+    #splitter.drag {
+      background: #1f2633;
+    }
+
+    .phd {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      background: var(--s1);
+      border-bottom: 1px solid var(--bdr);
+    }
+
+    .phd h2 {
+      font-family: var(--cond);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--mute);
+    }
+
+    #tabs {
+      display: flex;
+      overflow-x: auto;
+      scrollbar-width: none;
+      background: var(--s1);
+      border-bottom: 1px solid var(--bdr);
+      flex-shrink: 0;
+    }
+
+    #tabs::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tab {
+      font-family: var(--cond);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 5px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      border-right: 1px solid var(--bdr);
+      color: var(--mute);
+      border-bottom: 2px solid transparent;
+    }
+
+    .tab:hover {
+      color: var(--txt);
+    }
+
+    .tab.on {
+      color: var(--acc);
+      border-bottom-color: var(--acc);
+      background: var(--s2);
+    }
+
+    #event-banner {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      background: #00e5ff14;
+      border-bottom: 1px solid var(--acc);
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--acc);
+      flex-shrink: 0;
+    }
+
+    #event-banner.on {
+      display: flex;
+    }
+
+    #event-x {
+      margin-left: auto;
+      cursor: pointer;
+      color: var(--mute);
+    }
+
+    #event-x:hover {
+      color: var(--acc2);
+    }
+
+    #cvs-wrap {
+      flex: 1 1 0;
+      overflow: auto;
+      padding: 8px;
+      min-height: 0;
+      scrollbar-width: thin;
+      scrollbar-color: var(--bdr2) transparent;
+    }
+
+    #cvs {
+      position: relative;
+      background: var(--s2);
+      border-radius: 4px;
+      min-height: 80px;
+    }
+
+    .tcb {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 4px;
+      font-family: var(--cond);
+      font-size: 11px;
+      font-weight: 600;
+      text-align: center;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      border-radius: 3px;
+      user-select: none;
+    }
+
+    .tcb.clk {
+      cursor: pointer;
+    }
+
+    .tcb.clk:hover {
+      filter: brightness(1.3);
+    }
+
+    .tcb.event-active {
+      outline: 2px solid var(--acc);
+      box-shadow: 0 0 6px #00e5ff44;
+    }
+
+    #exp-bar {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      background: var(--s1);
+      border-top: 1px solid var(--bdr);
+    }
+
+    #selct {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--mute);
+      margin-right: auto;
+    }
+
+    #type-tools {
+      flex-shrink: 0;
+      padding: 6px 8px;
+      border-top: 1px solid var(--bdr);
+      background: var(--s1);
+    }
+
+    #type-hd {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+
+    #type-hd strong {
+      font-family: var(--cond);
+      font-size: 10px;
+      letter-spacing: 0.8px;
+      color: var(--mute);
+      text-transform: uppercase;
+    }
+
+    #type-ct {
+      margin-left: auto;
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--mute);
+    }
+
+    #type-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      max-height: 84px;
+      overflow: auto;
+    }
+
+    .type-opt {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 5px;
+      border: 1px solid var(--bdr);
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--txt);
+      background: var(--s2);
+    }
+
+    .type-opt small {
+      color: var(--mute);
+    }
+
+    #type-ops {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    #type-empty {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--mute);
+    }
+
+    /* ── TIMELINE ROW ────────────────────────────────────── */
+    #tl-hd {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 3px 8px;
+      background: var(--s1);
+      border-bottom: 1px solid var(--bdr);
+    }
+
+    #tl-hd h2 {
+      font-family: var(--cond);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--mute);
+    }
+
+    #tl-ct {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--mute);
+    }
+
+    #tl-hint {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--mute);
+      opacity: .9;
+    }
+
+    #tl-filter {
+      margin-left: auto;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--mute);
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    #vis-tl {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    /* ── VIS OVERRIDES ───────────────────────────────────── */
+    .vis-timeline {
+      border: none !important;
+      background: var(--bg) !important;
+    }
+
+    .vis-panel.vis-left {
+      background: var(--s2) !important;
+    }
+
+    .vis-time-axis {
+      background: var(--s1) !important;
+    }
+
+    .vis-time-axis .vis-text {
+      color: var(--mute) !important;
+      font-family: var(--mono) !important;
+      font-size: 10px !important;
+    }
+
+    .vis-time-axis .vis-grid.vis-minor {
+      border-color: var(--bdr) !important;
+    }
+
+    .vis-time-axis .vis-grid.vis-major {
+      border-color: var(--bdr2) !important;
+    }
+
+    .vis-labelset .vis-label {
+      background: var(--s2) !important;
+      color: var(--mute) !important;
+      border-color: var(--bdr) !important;
+      font-family: var(--cond) !important;
+      font-size: 10px !important;
+      font-weight: 700 !important;
+    }
+
+    .vis-labelset .vis-label .vis-inner {
+      padding: 3px 6px !important;
+    }
+
+    .vis-background .vis-group {
+      border-bottom: 1px solid var(--bdr) !important;
+    }
+
+    .vis-background .vis-group.vis-even {
+      background: #12151a !important;
+    }
+
+    .vis-background .vis-group.vis-odd {
+      background: #0f1116 !important;
+    }
+
+    .vis-foreground .vis-group {
+      border-bottom: none !important;
+    }
+
+    .vis-item.vis-range {
+      border-radius: 2px !important;
+      min-height: 14px !important;
+      border-width: 0 !important;
+      opacity: .85;
+    }
+
+    .vis-item.vis-range .vis-item-content {
+      padding: 0 !important;
+    }
+
+    .vis-item.vis-range.vis-selected {
+      opacity: 1;
+      outline: 1.5px solid var(--acc) !important;
+    }
+
+    .vis-custom-time {
+      background-color: var(--acc2) !important;
+      width: 2px !important;
+    }
+
+    .vis-panel.vis-center,
+    .vis-panel.vis-top,
+    .vis-panel.vis-bottom {
+      background: var(--bg) !important;
+    }
+
+    /* ── MODAL ───────────────────────────────────────────── */
+    #overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #000a;
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #overlay.on {
+      display: flex;
+    }
+
+    #modal {
+      background: var(--s1);
+      border: 1px solid var(--bdr2);
+      border-radius: 6px;
+      padding: 20px;
+      max-width: 500px;
+      width: 92%;
+    }
+
+    #modal h3 {
+      font-family: var(--cond);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--acc);
+      margin-bottom: 10px;
+    }
+
+    #modal p {
+      font-size: 12px;
+      color: var(--mute);
+      margin-bottom: 12px;
+      line-height: 1.6;
+    }
+
+    #modal pre {
+      background: var(--s2);
+      border: 1px solid var(--bdr);
+      border-radius: 4px;
+      padding: 10px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--acc3);
+      overflow: auto;
+      max-height: 300px;
+      margin-bottom: 12px;
+    }
+
+    .mbtns {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    /* ── TEMPLATE EDITOR ───────────────────────────────── */
+    #te-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #000a;
+      z-index: 60;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #te-overlay.on {
+      display: flex;
+    }
+
+    #te-modal {
+      width: min(1400px, 96vw);
+      height: min(860px, calc(100vh - 24px));
+      background: var(--s1);
+      border: 1px solid var(--bdr2);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #te-top {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--bdr);
+      background: #151b24;
+    }
+
+    #te-title {
+      font-family: var(--cond);
+      font-size: 12px;
+      letter-spacing: 1px;
+      color: var(--acc);
+      text-transform: uppercase;
+      margin-right: 6px;
+    }
+
+    .te-sp {
+      flex: 1 1 auto;
+      min-width: 10px;
+    }
+
+    #te-main {
+      flex: 1 1 0;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 390px minmax(0, 1fr);
+    }
+
+    #te-side {
+      border-right: 1px solid var(--bdr);
+      padding: 8px;
+      overflow: auto;
+    }
+
+    .te-box {
+      border: 1px solid var(--bdr);
+      border-radius: 6px;
+      background: var(--s2);
+      margin-bottom: 8px;
+    }
+
+    .te-hd {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--bdr);
+      font-family: var(--cond);
+      font-size: 10px;
+      letter-spacing: .8px;
+      color: var(--mute);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .te-bd {
+      padding: 6px;
+    }
+
+    .te-list {
+      max-height: 110px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .te-row {
+      border: 1px solid var(--bdr);
+      border-radius: 4px;
+      padding: 3px 6px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--txt);
+      cursor: pointer;
+      background: #11151c;
+    }
+
+    .te-row.sel {
+      border-color: var(--acc);
+      color: var(--acc);
+    }
+
+    .te-grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .te-grid3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+
+    .te-field {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .te-field label {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--mute);
+    }
+
+    .te-field .txt,
+    .te-field input[type="color"] {
+      width: 100%;
+    }
+
+    .te-inline {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #te-canvas-wrap {
+      overflow: auto;
+      padding: 10px;
+      background: #0e1218;
+    }
+
+    #te-canvas {
+      position: relative;
+      min-width: 360px;
+      min-height: 180px;
+      background:
+        linear-gradient(#0000 19px, #ffffff08 20px),
+        linear-gradient(90deg, #0000 19px, #ffffff08 20px),
+        #111827;
+      background-size: 20px 20px, 20px 20px, auto;
+      border: 1px solid var(--bdr2);
+      border-radius: 6px;
+    }
+
+    .te-item {
+      position: absolute;
+      border-radius: 3px;
+      border: 1px solid #0005;
+      font-family: var(--cond);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      cursor: move;
+      box-sizing: border-box;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding: 2px 4px;
+    }
+
+    .te-item.sel {
+      outline: 2px solid var(--acc);
+    }
+
+    .te-handle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      right: -1px;
+      bottom: -1px;
+      background: #0009;
+      border-top-left-radius: 4px;
+      cursor: nwse-resize;
+    }
+
+    #te-empty {
+      font-family: var(--mono);
+      color: var(--mute);
+      font-size: 11px;
+      padding: 8px;
+    }
+
+    /* ── START SCREEN ────────────────────────────────────── */
+    #start-screen {
+      display: none;
+      position: fixed;
+      inset: var(--BAR) 0 0 0;
+      z-index: 35;
+      background:
+        radial-gradient(1200px 500px at -10% 110%, #0084ff2e 0%, transparent 65%),
+        linear-gradient(180deg, #0e1218 0%, #0a0d12 100%);
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+    }
+
+    #start-screen.on {
+      display: flex;
+    }
+
+    #start-card {
+      width: min(960px, 100%);
+      border: 1px solid var(--bdr2);
+      border-radius: 8px;
+      background: #121722cc;
+      box-shadow: 0 12px 30px #0008;
+      padding: 26px;
+    }
+
+    #start-head {
+      margin-bottom: 18px;
+    }
+
+    #start-head h1 {
+      font-family: var(--cond);
+      font-size: 26px;
+      letter-spacing: 2px;
+      color: var(--txt);
+      text-transform: uppercase;
+    }
+
+    #start-head p {
+      margin-top: 6px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--mute);
+    }
+
+    #start-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
+    .start-btn {
+      border: 1px solid var(--bdr2);
+      border-radius: 6px;
+      background: #1a2230;
+      color: var(--txt);
+      padding: 16px 14px;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color .12s, transform .12s, background .12s;
+    }
+
+    .start-btn:hover {
+      border-color: var(--acc);
+      transform: translateY(-1px);
+      background: #1e2a3e;
+    }
+
+    .start-btn h3 {
+      font-family: var(--cond);
+      font-size: 16px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .start-btn p {
+      margin-top: 6px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--mute);
+      line-height: 1.4;
+    }
+
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--bdr2);
+      border-radius: 2px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- TOPBAR -->
+  <div id="bar">
+    <span class="logo">⬡ TAGGER</span>
+    <div class="vr"></div>
+    <button class="btn" id="b-new-prj">🆕 Project</button>
+    <button class="btn" id="b-open-prj">📂 Open Project</button>
+    <button class="btn" id="b-save-prj">💾 Save Project</button>
+    <button class="btn" id="b-home">🏠 Home</button>
+    <input class="txt" type="text" id="prj-name" placeholder="Project name" style="width:190px" />
+    <div class="vr"></div>
+    <div class="fbtn"><button class="btn">📁 Session</button><input type="file" id="f-session" accept=".json" /></div>
+    <div class="fbtn"><button class="btn">🏷 Template</button><input type="file" id="f-tmpl" accept=".json" /></div>
+    <div class="fbtn"><button class="btn">🎬 Video</button><input type="file" id="f-video"
+        accept="video/*,.ts,.mts,.m2ts,.mpeg,.mpg" /></div>
+    <button class="btn" id="b-tools">⚙ Tools</button>
+    <div class="vr"></div>
+    <button class="btn" id="b-lock">🔒 Lock</button>
+    <div id="bar-grow"></div>
+    <div id="proj-info">Project: none</div>
+    <div id="st">Ready.</div>
+  </div>
+  <div id="toolbar-dd">
+    <div id="toolbar-grid">
+      <div class="tool-card">
+        <div class="tool-title">Template</div>
+        <div class="tool-row">
+          <input class="txt" type="text" id="tmpl-path" value="" placeholder="Template JSON path" />
+          <button class="btn" id="b-load-tmpl-path">↻ Template Path</button>
+        </div>
+        <div class="tool-row" style="margin-top:6px">
+          <select class="txt" id="tmpl-lib"></select>
+          <button class="btn" id="b-use-tmpl-lib">Use Template</button>
+          <button class="btn" id="b-te-open">🛠 Template Editor</button>
+        </div>
+      </div>
+      <div class="tool-card">
+        <div class="tool-title">Video</div>
+        <div class="tool-row">
+          <button class="btn" id="b-video-path">📂 Video Path</button>
+          <button class="btn" id="b-defvid">▶ Default Video</button>
+        </div>
+        <div class="tool-row" style="margin-top:6px">
+          <input class="txt" type="text" id="src-video-path" placeholder="Source video path (auto)" />
+        </div>
+      </div>
+      <div class="tool-card">
+        <div class="tool-title">Timeline</div>
+        <div class="tool-row">
+          <button class="btn" id="b-json">⬇ JSON</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- START SCREEN -->
+  <div id="start-screen">
+    <div id="start-card">
+      <div id="start-head">
+        <h1>LatchR</h1>
+        <p>Select how you want to begin.</p>
+      </div>
+      <div id="start-grid">
+        <button class="start-btn" id="b-start-new">
+          <h3>Create New Session</h3>
+          <p>Step-by-step: name project, pick video, tag template, timeline, and save project file.</p>
+        </button>
+        <button class="start-btn" id="b-start-open">
+          <h3>Choose Session</h3>
+          <p>Open an existing project file and continue editing with autosave.</p>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROOT -->
+  <div id="root">
+    <div id="main">
+
+      <!-- LEFT: video + event list -->
+      <div id="left">
+        <div id="vwrap">
+          <video id="vid" controls></video>
+        </div>
+        <div id="vctrl">
+          <span id="vtime">00:00:00</span>
+          <button class="sk" data-s="-10">−10s</button>
+          <button class="sk" data-s="-5">−5s</button>
+          <button class="sk" data-s="5">+5s</button>
+          <button class="sk" data-s="10">+10s</button>
+          <select id="spd">
+            <option value="0.25">0.25×</option>
+            <option value="0.5">0.5×</option>
+            <option value="0.75">0.75×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2×</option>
+          </select>
+          <div class="vr"></div>
+          <button class="btn" id="b-clip">▶ Clip</button>
+        </div>
+        <div id="etbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:26px"><input type="checkbox" class="chk" id="chk-all" /></th>
+                <th>Event</th>
+                <th>Labels</th>
+                <th>Period</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Dur</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="splitter" title="Drag to resize template panel"></div>
+
+      <!-- RIGHT: template -->
+      <div id="right">
+        <div class="phd">
+          <h2>Template</h2>
+          <span id="tmpl-info" style="font-family:var(--mono);font-size:9px;color:var(--mute);margin-left:auto"></span>
+        </div>
+        <div id="tabs"></div>
+        <div id="event-banner">
+          <span>● EVENT:</span>
+          <strong id="event-nm">—</strong>
+          <span id="event-t" style="color:var(--mute)"></span>
+          <span id="event-x">✕</span>
+        </div>
+        <div id="cvs-wrap">
+          <div id="cvs"></div>
+        </div>
+        <div id="type-tools">
+          <div id="type-hd">
+            <strong>Type Select</strong>
+            <span id="type-ct">0 type(s) marked</span>
+          </div>
+          <div id="type-list"></div>
+          <div id="type-ops">
+            <button class="btn" id="b-sel-types">Select Marked</button>
+            <button class="btn" id="b-clear-sel">Clear Selection</button>
+            <button class="btn" id="b-clear-types">Clear Marks</button>
+          </div>
+        </div>
+        <div id="exp-bar">
+          <span id="selct">0 selected</span>
+          <button class="btn pri" id="b-clips">⬇ Export Clips</button>
+        </div>
+      </div>
+
+    </div><!-- /main -->
+
+    <!-- TIMELINE -->
+    <div id="tl-splitter" title="Drag to resize timeline panel"></div>
+    <div id="tl-row">
+      <div id="tl-hd">
+        <h2>Timeline</h2>
+        <span id="tl-ct"></span>
+        <span id="tl-hint">Shift+wheel: horizontal · Ctrl+wheel: zoom</span>
+        <label id="tl-filter"><input type="checkbox" id="chk-sel" /> Selected only</label>
+      </div>
+      <div id="vis-tl"></div>
+    </div>
+  </div><!-- /root -->
+
+  <!-- MODAL -->
+  <div id="overlay">
+    <div id="modal">
+      <h3>📋 Clip Export</h3>
+      <p>JSON list with FFmpeg commands — relative video time in seconds.</p>
+      <pre id="mpre"></pre>
+      <div class="mbtns">
+        <button class="btn" id="b-copy">Copy</button>
+        <button class="btn" id="b-mc">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TEMPLATE EDITOR -->
+  <div id="te-overlay">
+    <div id="te-modal">
+      <div id="te-top">
+        <span id="te-title">Template Editor v1</span>
+        <input class="txt" id="te-name" type="text" placeholder="Template name" style="width:180px" />
+        <select class="txt" id="te-page" style="width:170px"></select>
+        <button class="btn" id="te-add-page">+ Page</button>
+        <div class="vr"></div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--mute)">Canvas</span>
+        <input class="txt" id="te-cw" type="number" min="300" step="10" style="width:74px" />
+        <input class="txt" id="te-ch" type="number" min="120" step="10" style="width:74px" />
+        <div class="te-sp"></div>
+        <button class="btn" id="te-new">New</button>
+        <button class="btn" id="te-load">Load Current</button>
+        <button class="btn pri" id="te-save">Save Template</button>
+        <button class="btn" id="te-apply">Apply</button>
+        <button class="btn" id="te-close">Close</button>
+      </div>
+      <div id="te-main">
+        <div id="te-side">
+          <div class="te-box">
+            <div class="te-hd">
+              <span>Events</span>
+              <div class="te-sp"></div>
+              <button class="btn" id="te-add-tag">+ Event</button>
+              <button class="btn" id="te-del-tag">Delete</button>
+            </div>
+            <div class="te-bd">
+              <div id="te-tags" class="te-list"></div>
+            </div>
+          </div>
+          <div class="te-box">
+            <div class="te-hd">
+              <span>Labels</span>
+              <div class="te-sp"></div>
+              <button class="btn" id="te-add-label">+ Label</button>
+              <button class="btn" id="te-del-label">Delete</button>
+            </div>
+            <div class="te-bd">
+              <div id="te-labels" class="te-list"></div>
+            </div>
+          </div>
+          <div class="te-box">
+            <div class="te-hd">
+              <span>Buttons</span>
+              <div class="te-sp"></div>
+              <button class="btn" id="te-add-item">+ Button</button>
+              <button class="btn" id="te-del-item">Delete</button>
+            </div>
+            <div class="te-bd">
+              <div id="te-items" class="te-list"></div>
+            </div>
+          </div>
+
+          <div class="te-box" id="te-event-form">
+            <div class="te-hd">Event Settings</div>
+            <div class="te-bd te-grid2">
+              <div class="te-field"><label>Name</label><input class="txt" id="te-event-name" type="text" /></div>
+              <div class="te-field"><label>Short Name</label><input class="txt" id="te-event-short" type="text" /></div>
+              <div class="te-field"><label>Hotkey</label><input class="txt" id="te-event-hotkey" type="text" /></div>
+              <div class="te-field"><label>Tooltip</label><input class="txt" id="te-event-tooltip" type="text" /></div>
+              <div class="te-field"><label>Color</label><input id="te-event-color" type="color" /></div>
+              <div class="te-field"><label>Manual Start/End</label><input class="chk" id="te-event-manual"
+                  type="checkbox" /></div>
+              <div class="te-field"><label>Pre-roll (s)</label><input class="txt" id="te-event-pre" type="number"
+                  step="0.1" /></div>
+              <div class="te-field"><label>Post-roll (s)</label><input class="txt" id="te-event-post" type="number"
+                  step="0.1" /></div>
+              <div class="te-field"><label>Prefer Reactivation</label><input class="chk" id="te-event-react"
+                  type="checkbox" /></div>
+              <div class="te-field"><label>Note On Add</label><input class="chk" id="te-event-note" type="checkbox" />
+              </div>
+            </div>
+          </div>
+
+          <div class="te-box" id="te-label-form">
+            <div class="te-hd">Label Settings</div>
+            <div class="te-bd te-grid2">
+              <div class="te-field"><label>Text</label><input class="txt" id="te-lbl-text" type="text" /></div>
+              <div class="te-field"><label>Short Name</label><input class="txt" id="te-lbl-short" type="text" /></div>
+              <div class="te-field"><label>Group</label><input class="txt" id="te-lbl-group" type="text" /></div>
+              <div class="te-field"><label>Hotkey</label><input class="txt" id="te-lbl-hotkey" type="text" /></div>
+              <div class="te-field"><label>Tooltip</label><input class="txt" id="te-lbl-tooltip" type="text" /></div>
+              <div class="te-field"><label>Global Label</label><input class="chk" id="te-lbl-global" type="checkbox" />
+              </div>
+            </div>
+          </div>
+
+          <div class="te-box" id="te-item-form">
+            <div class="te-hd">Button Settings</div>
+            <div class="te-bd">
+              <div class="te-grid3">
+                <div class="te-field"><label>X</label><input class="txt" id="te-it-x" type="number" /></div>
+                <div class="te-field"><label>Y</label><input class="txt" id="te-it-y" type="number" /></div>
+                <div class="te-field"><label>Z</label><input class="txt" id="te-it-z" type="number" /></div>
+                <div class="te-field"><label>Width</label><input class="txt" id="te-it-w" type="number" min="20" />
+                </div>
+                <div class="te-field"><label>Height</label><input class="txt" id="te-it-h" type="number" min="12" />
+                </div>
+                <div class="te-field"><label>Text Size</label><input class="txt" id="te-it-fs" type="number" min="6" />
+                </div>
+                <div class="te-field"><label>Bg</label><input id="te-it-bg" type="color" /></div>
+                <div class="te-field"><label>Text</label><input id="te-it-fg" type="color" /></div>
+                <div class="te-field"><label>Opacity</label><input class="txt" id="te-it-op" type="number" step="0.05"
+                    min="0" max="1" /></div>
+              </div>
+              <div class="te-inline" style="margin-top:6px">
+                <label class="te-inline" style="font-family:var(--mono);font-size:10px;color:var(--mute)"><input
+                    class="chk" id="te-it-showname" type="checkbox" /> show name</label>
+                <label class="te-inline" style="font-family:var(--mono);font-size:10px;color:var(--mute)"><input
+                    class="chk" id="te-it-showshortcut" type="checkbox" /> show shortcut</label>
+                <label class="te-inline" style="font-family:var(--mono);font-size:10px;color:var(--mute)"><input
+                    class="chk" id="te-it-showgroup" type="checkbox" /> show group</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="te-canvas-wrap">
+          <div id="te-canvas"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/vis-timeline@7.7.3/standalone/umd/vis-timeline-graph2d.min.js"
+    crossorigin="anonymous"></script>
+  <script>
+    (() => {
+      'use strict';
+
+      const MS = 1000, DFL = 10800;
+      const EXPORT_ROOT_DIR = 'video_prototype';
+      const PROJECT_VERSION = 1;
+      const LATCHR_ROOT_DEFAULT = 'LatchR';
+      const LATCHR_TEMPLATES_DEFAULT = 'LatchR/tag_templates';
+      const EXPORT_DESKTOP_ROOT = '~/Desktop/video_prototype';
+      const DEFAULT_VIDEO_PATH = '';
+      const DEFAULT_TEMPLATE_PATH = '';
+      let tl, viI, viG, locked = false, selEvId = null, filterOn = false;
+      let clipTimer = null, clipEnd = null, vidDur = DFL, localUrl = null;
+      let curVideoName = 'video.mp4';
+      let curVideoAbsPath = '';
+      let curTemplatePath = DEFAULT_TEMPLATE_PATH;
+      let curTemplateData = null;
+      let curTimelinePath = '';
+      let latchrRootPath = LATCHR_ROOT_DEFAULT;
+      let latchrTemplatesDir = LATCHR_TEMPLATES_DEFAULT;
+      let exportDesktopHandle = null;
+      const evts = new Map(), selIds = new Set();
+      const typeMarks = new Set();
+      let periods = [];
+      const T = { pages: [], tags: new Map(), labels: new Map(), items: [], page: 0, aKey: null, aStart: null, aData: null };
+      const PRJ = { path: '', name: '', dirty: false, autosaveTimer: null, saving: false, queued: false, suspend: false };
+      const TE = {
+        open: false,
+        base: {},
+        name: 'tag_template',
+        tags: [],
+        labels: [],
+        pages: [],
+        items: [],
+        page: 0,
+        canvasW: 1280,
+        canvasH: 720,
+        selEntity: null,
+        selItemId: null,
+        drag: null,
+      };
+
+      const g = id => document.getElementById(id);
+      const vid = g('vid');
+      const stEl = g('st');
+      const prjEl = g('proj-info');
+      const startScreenEl = g('start-screen');
+      const rootEl = g('root');
+      const mainEl = g('main');
+      const splitEl = g('splitter');
+      const tlSplitEl = g('tl-splitter');
+      const tlRowEl = g('tl-row');
+      const srcVideoPathEl = g('src-video-path');
+      const prjNameEl = g('prj-name');
+      const desktopAPI = window.latchrAPI || window.sportTaggerAPI || null;
+
+      // utils
+      const s2d = s => new Date(Math.max(0, +s) * MS);
+      const d2s = d => (d instanceof Date ? d.getTime() : new Date(d).getTime()) / MS;
+      const r1 = v => Math.round(+v * 10) / 10;
+      const p2 = n => String(Math.max(0, Math.trunc(+n))).padStart(2, '0');
+      const fmt = s => { s = Math.max(0, +s || 0); return `${p2(s / 3600)}:${p2((s % 3600) / 60)}:${p2(s % 60)}`; };
+      const fms = s => (+s).toFixed(3);
+      const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const rgb = (r, g, b) => `rgb(${r},${g},${b})`;
+      const dclone = obj => JSON.parse(JSON.stringify(obj ?? {}));
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, +v || 0));
+      function rgbToHex(r, g, b) {
+        const c = n => Math.max(0, Math.min(255, Math.round(+n || 0))).toString(16).padStart(2, '0');
+        return `#${c(r)}${c(g)}${c(b)}`;
+      }
+      function hexToRgb(hex) {
+        const h = String(hex || '').trim().replace('#', '');
+        if (!/^[0-9a-fA-F]{6}$/.test(h)) return [38, 79, 130];
+        return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+      }
+      function st(m, c = '') { stEl.textContent = m; stEl.className = c; }
+      function bname(p) {
+        const t = String(p || '').trim().replace(/\\/g, '/');
+        return t.split('/').pop() || t;
+      }
+      function projectBaseName(v) {
+        const t = cleanName(v || 'project').replace(/\.[A-Za-z0-9]{1,8}$/, '');
+        const s = t.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        return s || 'project';
+      }
+      function sanitizeProjectName(v) {
+        const raw = String(v ?? '').trim();
+        if (!raw) return '';
+        return raw.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/\s+/g, ' ').trim();
+      }
+      function projectNameSeed(preferred) {
+        const a = sanitizeProjectName(preferred);
+        if (a) return a;
+        const b = sanitizeProjectName(PRJ.name);
+        if (b) return b;
+        const c = sanitizeProjectName(String(curVideoName || '').replace(/\.[A-Za-z0-9]{1,8}$/, ''));
+        if (c && c.toLowerCase() !== 'video') return c;
+        return 'Project';
+      }
+      function setProjectInfo() {
+        if (!prjEl) return;
+        const name = PRJ.name || 'none';
+        const flag = PRJ.path ? (PRJ.dirty ? ' • autosave pending' : ' • autosave on') : ' • not saved';
+        prjEl.textContent = `Project: ${name}${flag}`;
+      }
+      function projectEvents() {
+        return [...evts.values()].sort((a, b) => a.start - b.start).map(ev => ({
+          id: ev.id,
+          name: ev.name,
+          start: +ev.start.toFixed(3),
+          end: +ev.end.toFixed(3),
+          period: ev.period || '',
+          labels: (ev.labels || []).map(l => l.text || l),
+          color: Array.isArray(ev.color) ? ev.color : [38, 79, 130],
+        }));
+      }
+      function buildProjectData() {
+        return {
+          project_version: PROJECT_VERSION,
+          project_name: PRJ.name || 'Untitled project',
+          saved_at: new Date().toISOString(),
+          video_path: curVideoAbsPath || resolveSourceVideoPath() || '',
+          template_path: curTemplatePath || '',
+          timeline_path: curTimelinePath || '',
+          events: projectEvents(),
+        };
+      }
+      function markProjectDirty() {
+        if (PRJ.suspend || !desktopAPI || !PRJ.path) return;
+        PRJ.dirty = true;
+        setProjectInfo();
+        if (PRJ.autosaveTimer) clearTimeout(PRJ.autosaveTimer);
+        PRJ.autosaveTimer = setTimeout(() => saveProjectFile(false), 600);
+      }
+      async function saveProjectFile(forceDialog) {
+        if (!desktopAPI?.saveProject) return false;
+        if (PRJ.saving) { PRJ.queued = true; return false; }
+        PRJ.saving = true;
+        if (PRJ.autosaveTimer) { clearTimeout(PRJ.autosaveTimer); PRJ.autosaveTimer = null; }
+
+        const payload = {
+          path: forceDialog ? '' : PRJ.path,
+          project_name: PRJ.name || 'Project',
+          default_name: `${projectBaseName(PRJ.name || 'project')}.latchr.json`,
+          data: buildProjectData(),
+        };
+        let out;
+        try {
+          out = await desktopAPI.saveProject(payload);
+        } catch (e) {
+          PRJ.saving = false;
+          st(`Project save error: ${e.message || e}`, 'err');
+          return false;
+        }
+        PRJ.saving = false;
+
+        if (!out?.ok) {
+          if (out?.canceled) return false;
+          st(`Project save error: ${out?.error || 'Unknown error'}`, 'err');
+          return false;
+        }
+        PRJ.path = String(out.path || PRJ.path || '');
+        PRJ.dirty = false;
+        setProjectInfo();
+        st(`Project saved: ${bname(PRJ.path)}`, 'ok');
+
+        if (PRJ.queued) {
+          PRJ.queued = false;
+          markProjectDirty();
+        }
+        return true;
+      }
+      function setProjectContext(name, pathText) {
+        PRJ.name = sanitizeProjectName(name) || 'Untitled project';
+        PRJ.path = String(pathText || '').trim();
+        PRJ.dirty = false;
+        if (prjNameEl) prjNameEl.value = PRJ.name;
+        setProjectInfo();
+      }
+      function showStartScreen() {
+        closeToolsMenu();
+        if (startScreenEl) startScreenEl.classList.add('on');
+      }
+      function hideStartScreen() {
+        if (startScreenEl) startScreenEl.classList.remove('on');
+      }
+      function closeToolsMenu() {
+        const panel = g('toolbar-dd');
+        const btn = g('b-tools');
+        if (panel) panel.classList.remove('on');
+        if (btn) btn.classList.remove('on');
+      }
+      function toggleToolsMenu() {
+        const panel = g('toolbar-dd');
+        const btn = g('b-tools');
+        if (!panel || !btn) return;
+        const next = !panel.classList.contains('on');
+        panel.classList.toggle('on', next);
+        btn.classList.toggle('on', next);
+      }
+      function setTemplateLibraryOptions(items, preferPath) {
+        const sel = g('tmpl-lib');
+        if (!sel) return;
+        const list = Array.isArray(items) ? items : [];
+        const wanted = String(preferPath || curTemplatePath || '').trim();
+        sel.innerHTML = '';
+        if (!list.length) {
+          const o = document.createElement('option');
+          o.value = '';
+          o.textContent = 'No templates in LatchR/tag_templates';
+          sel.appendChild(o);
+          sel.disabled = true;
+          return;
+        }
+        list.forEach(t => {
+          const o = document.createElement('option');
+          o.value = String(t.path || '');
+          o.textContent = String(t.name || bname(t.path || 'template.json'));
+          sel.appendChild(o);
+        });
+        sel.disabled = false;
+        const target = [...sel.options].findIndex(o => o.value === wanted);
+        if (target >= 0) sel.selectedIndex = target;
+      }
+      async function refreshTemplateLibrary(preferPath) {
+        if (!desktopAPI?.listTagTemplates) return;
+        let out;
+        try {
+          out = await desktopAPI.listTagTemplates();
+        } catch (e) {
+          st(`Template library error: ${e.message || e}`, 'err');
+          return;
+        }
+        if (!out?.ok) {
+          st(`Template library error: ${out?.error || 'Unknown error'}`, 'err');
+          return;
+        }
+        latchrRootPath = String(out.root || latchrRootPath || LATCHR_ROOT_DEFAULT);
+        latchrTemplatesDir = String(out.templates_dir || latchrTemplatesDir || LATCHR_TEMPLATES_DEFAULT);
+        setTemplateLibraryOptions(out.templates || [], preferPath);
+      }
+      async function provisionProjectAssets(projectName, videoPath, templatePath, timelinePath, videoImportMode) {
+        if (!desktopAPI?.provisionProject) {
+          return { ok: false, error: 'Desktop project provisioning unavailable' };
+        }
+        let out;
+        try {
+          out = await desktopAPI.provisionProject({
+            project_name: projectName,
+            video_path: videoPath || '',
+            video_import_mode: videoImportMode || 'copy',
+            template_path: templatePath || '',
+            timeline_path: timelinePath || '',
+          });
+        } catch (e) {
+          return { ok: false, error: e.message || String(e) };
+        }
+        if (!out?.ok) return { ok: false, error: out?.error || 'Workspace provisioning failed' };
+        latchrRootPath = String(out.root || latchrRootPath || LATCHR_ROOT_DEFAULT);
+        latchrTemplatesDir = String(out.templates_dir || latchrTemplatesDir || LATCHR_TEMPLATES_DEFAULT);
+        setTemplateLibraryOptions(out.templates || [], out.template_path || templatePath || '');
+        return out;
+      }
+
+      // periods
+      function baseMs() { if (!periods.length) return 0; return (periods.find(p => p.id === '1st Half') || periods[0]).startMs; }
+      function periodOf(ms) { let f = periods[0] || { id: '' }; for (const p of periods) { if (p.startMs <= ms) f = p; else break; } return f.id; }
+
+      // player
+      function now() { return +vid.currentTime || 0; }
+      function seek(s) {
+        const t = Math.max(0, Math.min(+s, vidDur));
+        try {
+          if (typeof vid.fastSeek === 'function') vid.fastSeek(t);
+          else vid.currentTime = t;
+        } catch (_) {
+          try { vid.currentTime = t; } catch (__) { }
+        }
+        ph(t);
+      }
+      function ph(s) { g('vtime').textContent = fmt(s); try { tl?.setCustomTime(s2d(s), 'ph'); } catch (_) { } }
+      function fileUrlFromPath(pathText) {
+        let p = String(pathText || '').trim();
+        if (!p) return '';
+        if (/^file:\/\//i.test(p)) return p;
+        p = p.replace(/\\/g, '/');
+        if (!p.startsWith('/')) p = '/' + p;
+        return encodeURI('file://' + p);
+      }
+
+      function playClip(ev) {
+        if (!ev) return;
+        if (clipTimer) { clearInterval(clipTimer); clipTimer = null; }
+        seek(ev.start); vid.play();
+        clipEnd = ev.end;
+        clipTimer = setInterval(() => { if (now() >= clipEnd) { vid.pause(); clearInterval(clipTimer); clipTimer = null; } }, 80);
+      }
+
+      // event model
+      function newId() { let mx = 0; evts.forEach(e => { const n = parseInt(e.id.slice(4), 10); if (n > mx) mx = n; }); return 'evt_' + String(mx + 1).padStart(4, '0'); }
+      function addEv(name, start, end, color, labels, period) {
+        const ev = { id: newId(), name, start: r1(start), end: r1(end), color, labels: labels || [], period: period || '' };
+        evts.set(ev.id, ev); return ev;
+      }
+      function delEv(id) { evts.delete(id); if (selEvId === id) selEvId = null; }
+
+      // timeline
+      function tlBuild(subset) {
+        const src = subset || evts;
+        const uG = new Map(), gD = [], iD = [];
+        src.forEach(ev => {
+          const k = ev.name || 'Unnamed';
+          if (!uG.has(k)) { const gid = 'g_' + k; uG.set(k, gid); gD.push({ id: gid, content: esc(k), order: gD.length }); }
+          const [r, gc, b] = ev.color || [38, 79, 130];
+          iD.push({
+            id: ev.id, group: uG.get(k), type: 'range', content: '',
+            title: `${esc(ev.name)} | ${fms(ev.start)}–${fms(ev.end)}s`,
+            start: s2d(ev.start), end: s2d(ev.end),
+            style: `background:${rgb(r, gc, b)};border-color:${rgb(r, gc, b)};`
+          });
+        });
+        viG.clear(); viI.clear();
+        if (gD.length) viG.add(gD);
+        if (iD.length) viI.add(iD);
+        g('tl-ct').textContent = evts.size + ' events';
+      }
+      function tlRefresh() {
+        const prev = selEvId;
+        const sub = filterOn && selIds.size ? new Map([...evts].filter(([id]) => selIds.has(id))) : null;
+        tlBuild(sub);
+        if (prev && evts.has(prev)) tl.setSelection([prev], { focus: false });
+      }
+      function tlBounds(reset) {
+        if (!tl) return;
+        evts.forEach(ev => {
+          ev.start = r1(Math.max(0, Math.min(ev.start, vidDur)));
+          ev.end = r1(Math.max(ev.start, Math.min(ev.end, vidDur)));
+        });
+        const ax = vidDur <= 720 ? { scale: 'second', step: 15 } : vidDur <= 1800 ? { scale: 'second', step: 30 } : vidDur <= 5400 ? { scale: 'minute', step: 1 } : { scale: 'minute', step: 5 };
+        tl.setOptions({ min: s2d(0), max: s2d(vidDur), timeAxis: ax, zoomMax: vidDur * MS });
+        if (reset) tl.setWindow(s2d(0), s2d(vidDur), { animation: false });
+      }
+      function bindTimelineWheelPan() {
+        const box = g('vis-tl');
+        if (!box || !tl) return;
+        box.addEventListener('wheel', e => {
+          if (!tl) return;
+          if (e.ctrlKey || e.metaKey) return; // keep ctrl/cmd + wheel for zoom
+          if (!e.shiftKey) return; // shift + wheel pans horizontally
+          e.preventDefault();
+          const w = tl.getWindow();
+          const span = Math.max(1, w.end.getTime() - w.start.getTime());
+          const raw = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+          const step = Math.max(100, Math.round(span * 0.08));
+          const shiftMs = Math.round((raw / 120) * step);
+          tl.setWindow(new Date(w.start.getTime() + shiftMs), new Date(w.end.getTime() + shiftMs), { animation: false });
+        }, { passive: false });
+      }
+      function initTl() {
+        viI = new vis.DataSet(); viG = new vis.DataSet();
+        tl = new vis.Timeline(g('vis-tl'), viI, viG, {
+          stack: false, selectable: true, multiselect: false,
+          showCurrentTime: false, showMajorLabels: false,
+          orientation: { axis: 'top', item: 'bottom' },
+          groupOrder: 'order', groupHeightMode: 'fixed',
+          horizontalScroll: true, verticalScroll: true,
+          horizontalScrollKey: 'shiftKey',
+          moveable: true, zoomable: true, zoomKey: 'ctrlKey',
+          height: '100%', maxHeight: '100%',
+          min: s2d(0), max: s2d(vidDur), start: s2d(0), end: s2d(vidDur),
+          zoomMin: 500, zoomMax: vidDur * MS,
+          margin: { item: { vertical: 4 }, axis: 4 },
+          format: {
+            minorLabels(date, scale) { const s = d2s(date); return (scale === 'millisecond' || scale === 'second') ? fmt(s) : fmt(s).slice(0, 5); },
+            majorLabels() { return ''; }
+          },
+          snap: date => new Date(Math.round(date.valueOf() / 100) * 100),
+          editable: { add: false, remove: false, updateGroup: false, updateTime: true },
+          onMoving(item, cb) {
+            if (locked) { cb(item); return; }
+            const s = r1(Math.max(0, Math.min(vidDur, d2s(item.start))));
+            const e = Math.max(s, r1(Math.max(0, Math.min(vidDur, d2s(item.end)))));
+            item.start = s2d(s); item.end = s2d(e);
+            cb(item);
+            seek(s);
+          },
+          onMove(item, cb) {
+            if (locked) { cb(null); return; }
+            const ev = evts.get(String(item.id));
+            if (!ev) { cb(item); return; }
+            ev.start = r1(Math.max(0, Math.min(vidDur, d2s(item.start))));
+            ev.end = r1(Math.max(ev.start, Math.min(vidDur, d2s(item.end))));
+            item.start = s2d(ev.start); item.end = s2d(ev.end);
+            cb(item); renderTable();
+            seek(ev.start);
+            markProjectDirty();
+          },
+        });
+        tl.addCustomTime(s2d(0), 'ph');
+        tl.on('click', p => {
+          if (p.item) { selEv(String(p.item), true); }
+          else if (p.time) { seek(Math.max(0, d2s(p.time))); if (selEvId && evts.has(selEvId)) tl.setSelection([selEvId], { focus: false }); }
+        });
+        bindTimelineWheelPan();
+      }
+
+      // event table
+      function renderTable() {
+        const tb = g('tbody'); tb.innerHTML = '';
+        [...evts.values()].sort((a, b) => a.start - b.start).forEach(ev => {
+          const [r, gc, b] = ev.color || [38, 79, 130];
+          const tr = document.createElement('tr');
+          if (ev.id === selEvId) tr.classList.add('sel');
+          tr.innerHTML = `
+      <td><input type="checkbox" class="chk rck" data-id="${ev.id}"${selIds.has(ev.id) ? ' checked' : ''}></td>
+      <td><span class="dot" style="background:${rgb(r, gc, b)}"></span>${esc(ev.name)}</td>
+      <td style="color:var(--mute)">${ev.labels.map(l => `<small>${esc(l.text || l)}</small>`).join(' ')}</td>
+      <td style="color:var(--mute)">${esc(ev.period)}</td>
+      <td>${fmt(ev.start)}</td><td>${fmt(ev.end)}</td>
+      <td style="color:var(--mute)">${(ev.end - ev.start).toFixed(1)}s</td>`;
+          tr.addEventListener('click', e => { if (e.target.classList.contains('rck')) return; selEv(ev.id, true); });
+          tr.querySelector('.rck').addEventListener('change', function () { this.checked ? selIds.add(ev.id) : selIds.delete(ev.id); updCount(); });
+          tb.appendChild(tr);
+        });
+        updCount();
+        renderTypeTools();
+      }
+      function updCount() { g('selct').textContent = selIds.size + ' selected'; }
+      function updTypeCount() { g('type-ct').textContent = `${typeMarks.size} type(s) marked`; }
+      function renderTypeTools() {
+        const list = g('type-list');
+        if (!list) return;
+
+        const counts = new Map();
+        evts.forEach(ev => {
+          const name = String(ev.name || 'Event');
+          counts.set(name, (counts.get(name) || 0) + 1);
+        });
+
+        const names = [...counts.keys()].sort((a, b) => a.localeCompare(b));
+        typeMarks.forEach(n => { if (!counts.has(n)) typeMarks.delete(n); });
+        list.innerHTML = '';
+        if (!names.length) {
+          const d = document.createElement('div');
+          d.id = 'type-empty';
+          d.textContent = 'No events available';
+          list.appendChild(d);
+          updTypeCount();
+          return;
+        }
+
+        names.forEach(name => {
+          const lbl = document.createElement('label');
+          lbl.className = 'type-opt';
+
+          const chk = document.createElement('input');
+          chk.type = 'checkbox';
+          chk.className = 'chk';
+          chk.checked = typeMarks.has(name);
+          chk.addEventListener('change', () => {
+            if (chk.checked) typeMarks.add(name);
+            else typeMarks.delete(name);
+            updTypeCount();
+          });
+
+          const tx = document.createElement('span');
+          tx.textContent = name;
+          const ct = document.createElement('small');
+          ct.textContent = `(${counts.get(name)})`;
+
+          lbl.appendChild(chk);
+          lbl.appendChild(tx);
+          lbl.appendChild(ct);
+          list.appendChild(lbl);
+        });
+        updTypeCount();
+      }
+      function selectMarkedTypes() {
+        if (!typeMarks.size) { st('Mark at least one type', 'err'); return; }
+        selIds.clear();
+        evts.forEach((ev, id) => { if (typeMarks.has(String(ev.name || 'Event'))) selIds.add(id); });
+        renderTable();
+        tlRefresh();
+        st(`Selected ${selIds.size} events from ${typeMarks.size} type(s)`, 'ok');
+      }
+      function clearSelection() {
+        if (!selIds.size) { st('Selection already empty'); return; }
+        selIds.clear();
+        renderTable();
+        tlRefresh();
+        st('Selection cleared', 'ok');
+      }
+      function clearTypeMarks() {
+        if (!typeMarks.size) { st('Type marks already empty'); return; }
+        typeMarks.clear();
+        renderTypeTools();
+        st('Type marks cleared', 'ok');
+      }
+      function selEv(id, doSeek) {
+        selEvId = id; const ev = evts.get(id); if (!ev) return;
+        tl.setSelection([id], { focus: false });
+        if (doSeek) seek(ev.start);
+        renderTable();
+      }
+
+      // loaders
+      function loadSession(data) {
+        evts.clear(); selIds.clear(); selEvId = null;
+        periods = (data.timing || []).map(t => ({ id: t.period_id, startMs: t.start_name })).sort((a, b) => a.startMs - b.startMs);
+        const base = baseMs();
+        (data.tags || []).forEach((t, i) => {
+          if (!t['tag-start'] || !t['tag-end']) return;
+          const s = (t['tag-start'] - base) / 1000, e = (t['tag-end'] - base) / 1000;
+          if (e < s) return;
+          evts.set(t['tag-id'] || `evt_${i}`, {
+            id: t['tag-id'] || `evt_${i}`, name: t['tag-name'] || 'Event',
+            start: r1(s), end: r1(e),
+            color: [t['tag-colour_r'] || 38, t['tag-colour_g'] || 79, t['tag-colour_b'] || 130],
+            labels: (t['tag-labels'] || []).map(l => ({ text: l['label-text'] || '' })),
+            period: periodOf(t['tag-start']),
+          });
+        });
+        let mx = 60; evts.forEach(e => { if (e.end > mx) mx = e.end; });
+        vidDur = mx + 60; tlBounds(true); tlRefresh(); renderTable();
+        st(`${evts.size} events — ${data.session?.['session-event_name'] || ''}`, 'ok');
+      }
+      function loadSimple(data) {
+        evts.clear(); selIds.clear(); selEvId = null; periods = [];
+        if (!Array.isArray(data)) { st('Expected JSON array', 'err'); return; }
+        data.forEach((raw, i) => {
+          const s = +raw.start, e = +raw.end;
+          if (!isFinite(s) || !isFinite(e) || e < s) return;
+          const id = String(raw.id || `evt_${i}`);
+          evts.set(id, { id, name: raw.label || 'Event', start: r1(s), end: r1(e), color: [38, 79, 130], labels: [], period: '' });
+        });
+        let mx = 60; evts.forEach(e => { if (e.end > mx) mx = e.end; });
+        vidDur = mx + 60; tlBounds(true); tlRefresh(); renderTable();
+        st(`${evts.size} events`, 'ok');
+      }
+      function loadProjectEvents(data) {
+        evts.clear(); selIds.clear(); selEvId = null; periods = [];
+        if (!Array.isArray(data)) { st('Project events must be an array', 'err'); return; }
+        data.forEach((raw, i) => {
+          const s = +raw.start, e = +raw.end;
+          if (!isFinite(s) || !isFinite(e) || e < s) return;
+          const id = String(raw.id || `evt_${i}`);
+          const c = Array.isArray(raw.color) && raw.color.length >= 3 ? raw.color : [38, 79, 130];
+          evts.set(id, {
+            id,
+            name: raw.name || raw.label || 'Event',
+            start: r1(s),
+            end: r1(e),
+            color: [+c[0] || 38, +c[1] || 79, +c[2] || 130],
+            labels: Array.isArray(raw.labels) ? raw.labels.map(l => typeof l === 'string' ? { text: l } : l) : [],
+            period: raw.period || '',
+          });
+        });
+        let mx = 60; evts.forEach(e => { if (e.end > mx) mx = e.end; });
+        vidDur = mx + 60; tlBounds(true); tlRefresh(); renderTable();
+        st(`${evts.size} project events`, 'ok');
+      }
+
+      function mapAbsolutePathToServerPath(pathText) {
+        const t = String(pathText || '').trim();
+        if (!t) return '';
+        if (/^https?:\/\//i.test(t)) return t;
+        const m = t.match(/^\/Users\/[^/]+(\/.*)?$/);
+        if (m) return m[1] || '/';
+        return t;
+      }
+      function isAbsPath(pathText) {
+        const t = String(pathText || '').trim();
+        return t.startsWith('/') || t.startsWith('~') || /^[A-Za-z]:[\\/]/.test(t);
+      }
+
+      async function loadJsonPathViaApi(pathText) {
+        if (desktopAPI?.loadJsonPath) {
+          try {
+            const out = await desktopAPI.loadJsonPath(pathText);
+            if (out?.ok) return { supported: true, ok: true, data: out.data, path: out.path };
+            return { supported: true, error: out?.error || 'Desktop JSON load failed' };
+          } catch (e) {
+            return { supported: true, error: e?.message || String(e) };
+          }
+        }
+
+        let resp;
+        try {
+          resp = await fetch('/api/load-json-path', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: pathText }),
+          });
+        } catch (_) {
+          return { supported: false };
+        }
+
+        const ctype = String(resp.headers.get('content-type') || '').toLowerCase();
+        if ((resp.status === 404 || resp.status === 501) && !ctype.includes('application/json')) {
+          return { supported: false };
+        }
+
+        let payload = {};
+        try { payload = ctype.includes('application/json') ? await resp.json() : {}; } catch (_) { }
+        if (!resp.ok) {
+          return { supported: true, error: payload.error || `HTTP ${resp.status}` };
+        }
+        return { supported: true, ok: true, data: payload.data, path: payload.path };
+      }
+
+      async function loadTmplPath(pathText) {
+        const raw = String(pathText || '').trim();
+        if (!raw) { st('Template path is empty', 'err'); return false; }
+
+        const api = await loadJsonPathViaApi(raw);
+        if (api?.ok) {
+          let resolvedPath = String(api.path || raw);
+          if (desktopAPI && PRJ.path && !PRJ.suspend) {
+            const prov = await provisionProjectAssets(PRJ.name || 'Project', '', resolvedPath, '');
+            if (!prov?.ok) { st(`Template import error: ${prov?.error || 'Unknown error'}`, 'err'); return false; }
+            resolvedPath = String(prov.template_path || resolvedPath);
+          }
+          loadTmpl(api.data);
+          curTemplatePath = resolvedPath;
+          const tp = g('tmpl-path'); if (tp) tp.value = curTemplatePath;
+          if (desktopAPI) await refreshTemplateLibrary(curTemplatePath);
+          st(`Template loaded from ${curTemplatePath}`, 'ok');
+          if (PRJ.path) markProjectDirty();
+          return true;
+        }
+        if (api?.supported && api?.error) {
+          st(`Template path error: ${api.error}`, 'err');
+          return false;
+        }
+        if (isAbsPath(raw)) {
+          st('Template absolute paths require API server: python3 server.py 8000', 'err');
+          return false;
+        }
+
+        const path = mapAbsolutePathToServerPath(raw);
+        try {
+          const r = await fetch(encodeURI(path), { cache: 'no-store' });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          loadTmpl(await r.json());
+          curTemplatePath = raw;
+          const tp = g('tmpl-path'); if (tp) tp.value = curTemplatePath;
+          if (desktopAPI) await refreshTemplateLibrary(curTemplatePath);
+          if (PRJ.path) markProjectDirty();
+          return true;
+        } catch (e) {
+          const h = path.startsWith('/Desktop/') ? ' (try file button from repo mode)' : '';
+          st(`Template path error: ${e.message}${h}`, 'err');
+          return false;
+        }
+      }
+
+      function applyTimelineData(d) {
+        if (Array.isArray(d)) { loadSimple(d); return true; }
+        if (d && Array.isArray(d.events)) { loadProjectEvents(d.events); return true; }
+        if (d && d.session && d.tags) { loadSession(d); return true; }
+        return false;
+      }
+      async function loadTimelinePath(pathText) {
+        const raw = String(pathText || '').trim();
+        if (!raw) { st('Timeline path is empty', 'err'); return false; }
+
+        const api = await loadJsonPathViaApi(raw);
+        if (api?.ok) {
+          if (!applyTimelineData(api.data)) { st('Timeline error: Unsupported JSON format', 'err'); return false; }
+          let resolvedPath = String(api.path || raw);
+          if (desktopAPI && PRJ.path && !PRJ.suspend) {
+            const prov = await provisionProjectAssets(PRJ.name || 'Project', '', '', resolvedPath);
+            if (!prov?.ok) { st(`Timeline import error: ${prov?.error || 'Unknown error'}`, 'err'); return false; }
+            resolvedPath = String(prov.timeline_path || resolvedPath);
+          }
+          curTimelinePath = resolvedPath;
+          if (PRJ.path) markProjectDirty();
+          return true;
+        }
+        if (api?.supported && api?.error) {
+          st(`Timeline path error: ${api.error}`, 'err');
+          return false;
+        }
+
+        const path = mapAbsolutePathToServerPath(raw);
+        try {
+          const r = await fetch(encodeURI(path), { cache: 'no-store' });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const d = await r.json();
+          if (!applyTimelineData(d)) throw new Error('Unsupported JSON format');
+          curTimelinePath = raw;
+          if (PRJ.path) markProjectDirty();
+          return true;
+        } catch (e) {
+          st(`Timeline path error: ${e.message}`, 'err');
+          return false;
+        }
+      }
+      function loadVideoFromPath(absPath, labelText) {
+        const abs = String(absPath || '').trim();
+        if (!abs) { st('Video path is empty', 'err'); return false; }
+        if (localUrl) { URL.revokeObjectURL(localUrl); localUrl = null; }
+        curVideoAbsPath = abs;
+        curVideoName = bname(abs) || 'video.mp4';
+        if (srcVideoPathEl) srcVideoPathEl.value = abs;
+        vid.src = fileUrlFromPath(abs);
+        vid.load();
+        if (PRJ.path) markProjectDirty();
+        st(labelText || `Video: ${curVideoName}`, 'ok');
+        return true;
+      }
+      function useDefaultVideo() {
+        if (desktopAPI) {
+          if (!DEFAULT_VIDEO_PATH) {
+            st('No default video configured. Use Video picker or open a project.', 'err');
+            return false;
+          }
+          return loadVideoFromPath(DEFAULT_VIDEO_PATH, `Using default video: ${bname(DEFAULT_VIDEO_PATH)}`);
+        }
+        if (localUrl) { URL.revokeObjectURL(localUrl); localUrl = null; }
+        curVideoName = 'video.mp4';
+        curVideoAbsPath = '';
+        if (srcVideoPathEl) srcVideoPathEl.value = './video.mp4';
+        vid.src = './video.mp4';
+        vid.load();
+        st('Using ./video.mp4', 'ok');
+        return true;
+      }
+
+      function loadTmpl(data) {
+        T.tags.clear(); T.labels.clear(); T.items = []; T.pages = []; clearActiveEvent();
+        curTemplateData = dclone(data || {});
+        (data.tags || []).forEach(t => T.tags.set(+t['tag_template-id'], t));
+        (data.labels || []).forEach(l => T.labels.set(+l['label_template-id'], l));
+        T.pages = (data['event-pages'] || []).map(p => ({ index: p['template_page-index'], name: p['template_page-name'], order: p['template_page-order'] })).sort((a, b) => a.order - b.order);
+        const tw = data['event-window'] || {};
+        T.items = [...(tw['event-window-items'] || []), ...(tw['event-window-items-extra-pages'] || [])];
+        T.page = T.pages[0]?.index ?? 0;
+        renderTabs(); renderCvs(T.page);
+        g('tmpl-info').textContent = `${data.tags?.length || 0}t·${data.labels?.length || 0}l·${T.pages.length}p`;
+        st(`Template: ${data.tags?.length || 0} tags`, 'ok');
+      }
+      function renderTabs() {
+        const el = g('tabs'); el.innerHTML = '';
+        T.pages.forEach(p => {
+          const d = document.createElement('div');
+          d.className = 'tab' + (p.index === T.page ? ' on' : '');
+          d.textContent = p.name;
+          d.onclick = () => { T.page = p.index; renderTabs(); renderCvs(p.index); };
+          el.appendChild(d);
+        });
+      }
+      function renderCvs(pi) {
+        const items = T.items.filter(i => i['event-window-item-page'] === pi);
+        const mxX = items.reduce((a, i) => Math.max(a, i['event-window-item-x'] + i['event-window-item-width']), 300);
+        const mxY = items.reduce((a, i) => Math.max(a, i['event-window-item-y'] + i['event-window-item-height']), 100);
+        const cvs = g('cvs'); cvs.style.width = mxX + 'px'; cvs.style.height = mxY + 'px'; cvs.innerHTML = '';
+        items.sort((a, b) => a['event-window-item-z'] - b['event-window-item-z']).forEach(item => {
+          const type = +item['event-window-item-type'], tid = +item['event-window-item-type-id'];
+          let label = '', action = null;
+          if (type === 1) { const t = T.tags.get(tid); label = t?.['tag_template-name'] || `Tag${tid}`; if (t) action = { key: `1:${tid}`, label, tag: t }; }
+          else if (type === 2) { const l = T.labels.get(tid); label = l?.['label_template-text'] || `Lbl${tid}`; if (l) action = { key: `2:${tid}`, label, lbl: l }; }
+          const d = document.createElement('div');
+          d.className = 'tcb' + (action ? ' clk' : '') + (action?.key === T.aKey ? ' tagging' : '');
+          d.style.cssText = `left:${item['event-window-item-x']}px;top:${item['event-window-item-y']}px;` +
+            `width:${item['event-window-item-width']}px;height:${item['event-window-item-height']}px;` +
+            `z-index:${item['event-window-item-z']};` +
+            `background:${item['event-window-item-button_background_colour'] || '#333'};` +
+            `color:${item['event-window-item-button_text_colour'] || '#fff'};` +
+            `opacity:${item['event-window-item-opacity'] ?? 1};`;
+          const ts = item['event-window-item-button_text_size'];
+          if (ts && ts > 0) d.style.fontSize = ts + 'px';
+          d.textContent = label; d.title = label;
+          if (action) { d.dataset.k = action.key; d.onclick = () => handleEventAction(action); }
+          cvs.appendChild(d);
+        });
+      }
+      function handleEventAction(a) { if (T.aKey === a.key) { finalizeActiveEvent(now()); return; } if (T.aKey) finalizeActiveEvent(now()); startActiveEvent(a); }
+      function startActiveEvent(a) {
+        T.aKey = a.key; T.aStart = r1(now()); T.aData = a;
+        g('event-banner').classList.add('on');
+        g('event-nm').textContent = a.label; g('event-t').textContent = '@ ' + fmt(T.aStart);
+        syncActiveEventButtons(); st(`Event active: ${a.label} — click again to end`);
+      }
+      function finalizeActiveEvent(et) {
+        if (!T.aData) return;
+        let s = T.aStart ?? r1(et), e = r1(et);
+        if (e < s) [s, e] = [e, s]; if (e - s < 0.1) e = s + 0.1;
+        const c = T.aData.tag ? [T.aData.tag['tag_template-colour_r'] ?? 38, T.aData.tag['tag_template-colour_g'] ?? 79, T.aData.tag['tag_template-colour_b'] ?? 130] : [38, 79, 130];
+        const ev = addEv(T.aData.label, s, e, c, [], '');
+        clearActiveEvent(); tlRefresh(); renderTable(); selEv(ev.id, false);
+        markProjectDirty();
+        st(`Added: ${ev.name} (${fms(s)}–${fms(e)}s)`, 'ok');
+      }
+      function clearActiveEvent() { T.aKey = null; T.aStart = null; T.aData = null; g('event-banner').classList.remove('on'); syncActiveEventButtons(); }
+      function syncActiveEventButtons() { g('cvs').querySelectorAll('.clk').forEach(b => b.classList.toggle('event-active', b.dataset.k === T.aKey)); }
+
+      // template editor
+      function teKeyType(item) { return +item['event-window-item-type'] === 2 ? 'label' : 'tag'; }
+      function teNextId(arr, key) {
+        let mx = 0;
+        (arr || []).forEach(o => { const n = +o?.[key]; if (Number.isFinite(n) && n > mx) mx = n; });
+        return mx + 1;
+      }
+      function teDefaultPage(index, order) {
+        return {
+          'template_page-index': index,
+          'template_page-name': `Page ${order + 1}`,
+          'template_page-order': order,
+        };
+      }
+      function teDefaultTag(id, page) {
+        return {
+          'tag_template-id': id,
+          'tag_template-name': `Tag ${id}`,
+          'tag_template-short_name': '',
+          'tag_template-tooltip': '',
+          'tag_template-hotkey': '',
+          'tag_template-colour_r': 38,
+          'tag_template-colour_g': 79,
+          'tag_template-colour_b': 130,
+          'tag_template-manual_start_end': true,
+          'tag_template-default_pre_roll_secs': 0,
+          'tag_template-default_post_roll_secs': 0,
+          'tag_template-prefer_reactivation': true,
+          'tag_template-note_on_add': false,
+          'tag_template-notes_prompt': false,
+          'tag_template-page': page,
+          'tag_template-pagelink-index': 0,
+          'tag_template-pagelink-type': 0,
+          'tag_template-activation-links_with_cycles': [],
+          'tag_template-deactivation-links_with_cycles': [],
+          'tag_template-exclusive-links_with_cycles': [],
+        };
+      }
+      function teDefaultLabel(id, page) {
+        return {
+          'label_template-id': id,
+          'label_template-text': `Label ${id}`,
+          'label_template-short_name': '',
+          'label_template-group': '',
+          'label_template-hotkey': '',
+          'label_template-tooltip': '',
+          'global-label': false,
+          'free-text-label': false,
+          'label_template-activation-links_with_cycles': [],
+          'tag_template-page': page,
+          'tag_template-pagelink-index': 0,
+          'tag_template-pagelink-type': 0,
+        };
+      }
+      function teDefaultItem(type, typeId, page, id) {
+        return {
+          'event-window-item-id': id,
+          'event-window-item-page': page,
+          'event-window-item-type': type,
+          'event-window-item-type-id': typeId,
+          'event-window-item-x': 20,
+          'event-window-item-y': 20,
+          'event-window-item-width': 120,
+          'event-window-item-height': 34,
+          'event-window-item-z': 1,
+          'event-window-item-button_background_colour': '#264f82',
+          'event-window-item-button_text_colour': '#ffffff',
+          'event-window-item-button_text_size': 11,
+          'event-window-item-opacity': 1,
+          'event-window-item-button_show_name': true,
+          'event-window-item-button_show_shortcut': false,
+          'event-window-item-button_show_group_name': false,
+          'event-window-item-button_show_border': false,
+          'event-window-item-button_border_colour': '#000000',
+          'event-window-item-button_border_width': 1,
+          'event-window-item-rotation': 0,
+        };
+      }
+      function teNormalizeTemplate(raw) {
+        const src = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? dclone(raw) : {};
+        const pagesRaw = Array.isArray(src['event-pages']) ? src['event-pages'] : [];
+        let pages = pagesRaw.map((p, i) => ({
+          ...p,
+          'template_page-index': Number.isFinite(+p['template_page-index']) ? +p['template_page-index'] : i,
+          'template_page-name': String(p['template_page-name'] || `Page ${i + 1}`),
+          'template_page-order': Number.isFinite(+p['template_page-order']) ? +p['template_page-order'] : i,
+        })).sort((a, b) => a['template_page-order'] - b['template_page-order']);
+        if (!pages.length) pages = [teDefaultPage(0, 0)];
+        const page0 = +pages[0]['template_page-index'];
+
+        const tags = (Array.isArray(src.tags) ? src.tags : []).map((t, i) => {
+          const id = Number.isFinite(+t['tag_template-id']) ? +t['tag_template-id'] : i + 1;
+          return {
+            ...teDefaultTag(id, page0),
+            ...t,
+            'tag_template-id': id,
+            'tag_template-name': String(t['tag_template-name'] || `Tag ${id}`),
+          };
+        });
+
+        const labels = (Array.isArray(src.labels) ? src.labels : []).map((l, i) => {
+          const id = Number.isFinite(+l['label_template-id']) ? +l['label_template-id'] : i + 1;
+          return {
+            ...teDefaultLabel(id, page0),
+            ...l,
+            'label_template-id': id,
+            'label_template-text': String(l['label_template-text'] || `Label ${id}`),
+          };
+        });
+
+        const tw = (src['event-window'] && typeof src['event-window'] === 'object') ? src['event-window'] : {};
+        const allItems = [...(Array.isArray(tw['event-window-items']) ? tw['event-window-items'] : []), ...(Array.isArray(tw['event-window-items-extra-pages']) ? tw['event-window-items-extra-pages'] : [])];
+        const items = allItems.map((it, i) => {
+          const id = Number.isFinite(+it['event-window-item-id']) ? +it['event-window-item-id'] : i + 1;
+          const page = Number.isFinite(+it['event-window-item-page']) ? +it['event-window-item-page'] : page0;
+          const type = (+it['event-window-item-type'] === 2) ? 2 : 1;
+          const typeId = Number.isFinite(+it['event-window-item-type-id']) ? +it['event-window-item-type-id'] : 1;
+          return {
+            ...teDefaultItem(type, typeId, page, id),
+            ...it,
+            'event-window-item-id': id,
+            'event-window-item-page': page,
+            'event-window-item-type': type,
+            'event-window-item-type-id': typeId,
+            'event-window-item-x': Math.round(+it['event-window-item-x'] || 0),
+            'event-window-item-y': Math.round(+it['event-window-item-y'] || 0),
+            'event-window-item-width': Math.max(20, Math.round(+it['event-window-item-width'] || 120)),
+            'event-window-item-height': Math.max(12, Math.round(+it['event-window-item-height'] || 34)),
+            'event-window-item-z': Math.round(+it['event-window-item-z'] || 1),
+          };
+        });
+
+        TE.base = src;
+        TE.tags = tags;
+        TE.labels = labels;
+        TE.pages = pages;
+        TE.items = items;
+        TE.page = page0;
+        TE.canvasW = Math.max(300, Math.round(+tw['event-window-canvas_width'] || 1280));
+        TE.canvasH = Math.max(120, Math.round(+tw['event-window-canvas_height'] || 720));
+        TE.selEntity = null;
+        TE.selItemId = null;
+      }
+      function teTemplateNameSeed() {
+        const p = String(curTemplatePath || '').trim();
+        if (p) return cleanName(bname(p).replace(/\.json$/i, ''));
+        return cleanName(PRJ.name || 'tag_template');
+      }
+      function teCurrentPage() { return Number.isFinite(+TE.page) ? +TE.page : +TE.pages?.[0]?.['template_page-index'] || 0; }
+      function teCurrentItem() { return TE.items.find(it => +it['event-window-item-id'] === +TE.selItemId) || null; }
+      function teCurrentEntity() {
+        if (!TE.selEntity) return null;
+        if (TE.selEntity.kind === 'tag') return TE.tags.find(t => +t['tag_template-id'] === +TE.selEntity.id) || null;
+        if (TE.selEntity.kind === 'label') return TE.labels.find(l => +l['label_template-id'] === +TE.selEntity.id) || null;
+        return null;
+      }
+      function teEntityTitle(kind, id) {
+        if (kind === 'tag') {
+          const t = TE.tags.find(x => +x['tag_template-id'] === +id);
+          return t ? String(t['tag_template-name'] || `Tag ${id}`) : `Tag ${id}`;
+        }
+        const l = TE.labels.find(x => +x['label_template-id'] === +id);
+        return l ? String(l['label_template-text'] || `Label ${id}`) : `Label ${id}`;
+      }
+      function teItemText(it) {
+        const kind = teKeyType(it);
+        return teEntityTitle(kind, it['event-window-item-type-id']);
+      }
+      function teRenderList(containerId, rows, selectedKey, keyFn, labelFn) {
+        const el = g(containerId); if (!el) return;
+        el.innerHTML = '';
+        if (!rows.length) { el.innerHTML = '<div id=\"te-empty\">No items</div>'; return; }
+        rows.forEach(r => {
+          const key = keyFn(r);
+          const row = document.createElement('div');
+          row.className = 'te-row' + (String(selectedKey) === String(key) ? ' sel' : '');
+          row.textContent = labelFn(r);
+          row.onclick = () => key;
+          row.dataset.key = String(key);
+          el.appendChild(row);
+        });
+      }
+      function teRenderPageOptions() {
+        const sel = g('te-page'); if (!sel) return;
+        const cur = String(teCurrentPage());
+        sel.innerHTML = '';
+        [...TE.pages].sort((a, b) => a['template_page-order'] - b['template_page-order']).forEach(p => {
+          const o = document.createElement('option');
+          o.value = String(p['template_page-index']);
+          o.textContent = `${p['template_page-name']} (#${p['template_page-index']})`;
+          sel.appendChild(o);
+        });
+        const idx = [...sel.options].findIndex(o => o.value === cur);
+        sel.selectedIndex = idx >= 0 ? idx : 0;
+      }
+      function teRenderEvents() {
+        const el = g('te-tags'); if (!el) return;
+        el.innerHTML = '';
+        if (!TE.tags.length) { el.innerHTML = '<div id=\"te-empty\">No tags</div>'; return; }
+        TE.tags.sort((a, b) => +a['tag_template-id'] - +b['tag_template-id']).forEach(t => {
+          const id = +t['tag_template-id'];
+          const row = document.createElement('div');
+          row.className = 'te-row' + (TE.selEntity?.kind === 'tag' && +TE.selEntity.id === id ? ' sel' : '');
+          row.textContent = `#${id} ${t['tag_template-name'] || `Tag ${id}`}`;
+          row.onclick = () => { TE.selEntity = { kind: 'tag', id }; teRenderAll(); };
+          el.appendChild(row);
+        });
+      }
+      function teRenderLabels() {
+        const el = g('te-labels'); if (!el) return;
+        el.innerHTML = '';
+        if (!TE.labels.length) { el.innerHTML = '<div id=\"te-empty\">No labels</div>'; return; }
+        TE.labels.sort((a, b) => +a['label_template-id'] - +b['label_template-id']).forEach(l => {
+          const id = +l['label_template-id'];
+          const row = document.createElement('div');
+          row.className = 'te-row' + (TE.selEntity?.kind === 'label' && +TE.selEntity.id === id ? ' sel' : '');
+          row.textContent = `#${id} ${l['label_template-text'] || `Label ${id}`}`;
+          row.onclick = () => { TE.selEntity = { kind: 'label', id }; teRenderAll(); };
+          el.appendChild(row);
+        });
+      }
+      function teRenderItems() {
+        const el = g('te-items'); if (!el) return;
+        const pg = teCurrentPage();
+        const items = TE.items.filter(it => +it['event-window-item-page'] === +pg).sort((a, b) => (+a['event-window-item-z'] - +b['event-window-item-z']));
+        el.innerHTML = '';
+        if (!items.length) { el.innerHTML = '<div id=\"te-empty\">No buttons on this page</div>'; return; }
+        items.forEach(it => {
+          const id = +it['event-window-item-id'];
+          const row = document.createElement('div');
+          row.className = 'te-row' + (+TE.selItemId === id ? ' sel' : '');
+          row.textContent = `#${id} ${teKeyType(it)} · ${teItemText(it)}`;
+          row.onclick = () => { TE.selItemId = id; teRenderAll(); };
+          el.appendChild(row);
+        });
+      }
+      function teRenderCanvas() {
+        const cvs = g('te-canvas'); if (!cvs) return;
+        cvs.style.width = `${TE.canvasW}px`;
+        cvs.style.height = `${TE.canvasH}px`;
+        cvs.innerHTML = '';
+        const pg = teCurrentPage();
+        const items = TE.items.filter(it => +it['event-window-item-page'] === +pg).sort((a, b) => (+a['event-window-item-z'] - +b['event-window-item-z']));
+        items.forEach(it => {
+          const id = +it['event-window-item-id'];
+          const d = document.createElement('div');
+          const bg = it['event-window-item-button_background_colour'] || '#264f82';
+          const fg = it['event-window-item-button_text_colour'] || '#ffffff';
+          const op = clamp(it['event-window-item-opacity'], 0, 1);
+          const shName = it['event-window-item-button_show_name'] !== false;
+          const text = shName ? teItemText(it) : '';
+          d.className = 'te-item' + (+TE.selItemId === id ? ' sel' : '');
+          d.style.left = `${Math.round(+it['event-window-item-x'] || 0)}px`;
+          d.style.top = `${Math.round(+it['event-window-item-y'] || 0)}px`;
+          d.style.width = `${Math.max(20, Math.round(+it['event-window-item-width'] || 120))}px`;
+          d.style.height = `${Math.max(12, Math.round(+it['event-window-item-height'] || 34))}px`;
+          d.style.zIndex = String(Math.round(+it['event-window-item-z'] || 1));
+          d.style.background = bg;
+          d.style.color = fg;
+          d.style.opacity = String(op);
+          d.style.fontSize = `${Math.max(6, Math.round(+it['event-window-item-button_text_size'] || 11))}px`;
+          if (it['event-window-item-button_show_border']) {
+            d.style.borderColor = String(it['event-window-item-button_border_colour'] || '#000');
+            d.style.borderWidth = `${Math.max(1, Math.round(+it['event-window-item-button_border_width'] || 1))}px`;
+            d.style.borderStyle = 'solid';
+          } else d.style.border = '1px solid #0005';
+          d.textContent = text;
+          d.onmousedown = e => { if (e.button !== 0) return; TE.selItemId = id; teStartItemDrag(e, id, e.target.classList.contains('te-handle') ? 'resize' : 'move'); teRenderAll(); };
+          const h = document.createElement('div');
+          h.className = 'te-handle';
+          d.appendChild(h);
+          cvs.appendChild(d);
+        });
+      }
+      function teRenderForms() {
+        const ent = teCurrentEntity();
+        const isTag = !!ent && TE.selEntity?.kind === 'tag';
+        const isLbl = !!ent && TE.selEntity?.kind === 'label';
+        const it = teCurrentItem();
+        g('te-event-form').style.display = isTag ? 'block' : 'none';
+        g('te-label-form').style.display = isLbl ? 'block' : 'none';
+        g('te-item-form').style.display = it ? 'block' : 'none';
+
+        if (isTag) {
+          g('te-event-name').value = String(ent['tag_template-name'] || '');
+          g('te-event-short').value = String(ent['tag_template-short_name'] || '');
+          g('te-event-hotkey').value = String(ent['tag_template-hotkey'] || '');
+          g('te-event-tooltip').value = String(ent['tag_template-tooltip'] || '');
+          g('te-event-color').value = rgbToHex(ent['tag_template-colour_r'], ent['tag_template-colour_g'], ent['tag_template-colour_b']);
+          g('te-event-manual').checked = !!ent['tag_template-manual_start_end'];
+          g('te-event-pre').value = String(+ent['tag_template-default_pre_roll_secs'] || 0);
+          g('te-event-post').value = String(+ent['tag_template-default_post_roll_secs'] || 0);
+          g('te-event-react').checked = !!ent['tag_template-prefer_reactivation'];
+          g('te-event-note').checked = !!ent['tag_template-note_on_add'];
+        }
+        if (isLbl) {
+          g('te-lbl-text').value = String(ent['label_template-text'] || '');
+          g('te-lbl-short').value = String(ent['label_template-short_name'] || '');
+          g('te-lbl-group').value = String(ent['label_template-group'] || '');
+          g('te-lbl-hotkey').value = String(ent['label_template-hotkey'] || '');
+          g('te-lbl-tooltip').value = String(ent['label_template-tooltip'] || '');
+          g('te-lbl-global').checked = !!ent['global-label'];
+        }
+        if (it) {
+          g('te-it-x').value = String(Math.round(+it['event-window-item-x'] || 0));
+          g('te-it-y').value = String(Math.round(+it['event-window-item-y'] || 0));
+          g('te-it-z').value = String(Math.round(+it['event-window-item-z'] || 1));
+          g('te-it-w').value = String(Math.max(20, Math.round(+it['event-window-item-width'] || 120)));
+          g('te-it-h').value = String(Math.max(12, Math.round(+it['event-window-item-height'] || 34)));
+          g('te-it-fs').value = String(Math.max(6, Math.round(+it['event-window-item-button_text_size'] || 11)));
+          g('te-it-bg').value = String(it['event-window-item-button_background_colour'] || '#264f82');
+          g('te-it-fg').value = String(it['event-window-item-button_text_colour'] || '#ffffff');
+          g('te-it-op').value = String(clamp(it['event-window-item-opacity'], 0, 1).toFixed(2));
+          g('te-it-showname').checked = it['event-window-item-button_show_name'] !== false;
+          g('te-it-showshortcut').checked = !!it['event-window-item-button_show_shortcut'];
+          g('te-it-showgroup').checked = !!it['event-window-item-button_show_group_name'];
+        }
+      }
+      function teRenderAll() {
+        g('te-name').value = TE.name || 'tag_template';
+        g('te-cw').value = String(Math.round(TE.canvasW));
+        g('te-ch').value = String(Math.round(TE.canvasH));
+        teRenderPageOptions();
+        teRenderEvents();
+        teRenderLabels();
+        teRenderItems();
+        teRenderCanvas();
+        teRenderForms();
+      }
+      function teStartItemDrag(e, itemId, mode) {
+        const it = TE.items.find(x => +x['event-window-item-id'] === +itemId);
+        if (!it) return;
+        TE.drag = {
+          id: +itemId, mode: mode || 'move',
+          sx: e.clientX, sy: e.clientY,
+          x: +it['event-window-item-x'] || 0,
+          y: +it['event-window-item-y'] || 0,
+          w: +it['event-window-item-width'] || 120,
+          h: +it['event-window-item-height'] || 34,
+        };
+        e.preventDefault();
+      }
+      function teOnMouseMove(e) {
+        if (!TE.drag) return;
+        const it = TE.items.find(x => +x['event-window-item-id'] === +TE.drag.id);
+        if (!it) return;
+        const dx = e.clientX - TE.drag.sx;
+        const dy = e.clientY - TE.drag.sy;
+        if (TE.drag.mode === 'resize') {
+          it['event-window-item-width'] = Math.max(20, Math.round(TE.drag.w + dx));
+          it['event-window-item-height'] = Math.max(12, Math.round(TE.drag.h + dy));
+        } else {
+          it['event-window-item-x'] = Math.max(0, Math.round(TE.drag.x + dx));
+          it['event-window-item-y'] = Math.max(0, Math.round(TE.drag.y + dy));
+        }
+        teRenderCanvas();
+        teRenderForms();
+      }
+      function teOnMouseUp() { TE.drag = null; }
+      function teBuildOutput() {
+        const out = dclone(TE.base || {});
+        out.tags = TE.tags.map(t => dclone(t));
+        out.labels = TE.labels.map(l => dclone(l));
+        out['event-pages'] = [...TE.pages].sort((a, b) => a['template_page-order'] - b['template_page-order']).map(p => dclone(p));
+        const firstPage = +out['event-pages'][0]?.['template_page-index'] || 0;
+        const items = TE.items.map(i => dclone(i));
+        const tw = (out['event-window'] && typeof out['event-window'] === 'object') ? out['event-window'] : {};
+        out['event-window'] = {
+          ...tw,
+          'event-window-canvas_width': Math.round(TE.canvasW),
+          'event-window-canvas_height': Math.round(TE.canvasH),
+          'event-window-items': items.filter(i => +i['event-window-item-page'] === +firstPage),
+          'event-window-items-extra-pages': items.filter(i => +i['event-window-item-page'] !== +firstPage),
+        };
+        if (!Array.isArray(out['output-configs'])) out['output-configs'] = [];
+        if (!Array.isArray(out['output-nodes'])) out['output-nodes'] = [];
+        if (!out['template-version']) out['template-version'] = '4.4';
+        if (!out['unique_id_map'] || typeof out['unique_id_map'] !== 'object') out['unique_id_map'] = {};
+        return out;
+      }
+      function openTemplateEditor(mode) {
+        const source = (mode === 'new') ? null : curTemplateData;
+        teNormalizeTemplate(source || {});
+        TE.name = teTemplateNameSeed();
+        TE.open = true;
+        g('te-overlay').classList.add('on');
+        teRenderAll();
+      }
+      function closeTemplateEditor() {
+        TE.open = false;
+        TE.drag = null;
+        g('te-overlay').classList.remove('on');
+      }
+      async function saveTemplateEditor() {
+        const nm = cleanName(g('te-name').value || TE.name || 'tag_template').replace(/\.json$/i, '');
+        TE.name = nm || 'tag_template';
+        const data = teBuildOutput();
+        if (desktopAPI?.saveTagTemplate) {
+          let out;
+          try {
+            out = await desktopAPI.saveTagTemplate({ template_name: TE.name, data, project_path: PRJ.path || '' });
+          } catch (e) {
+            st(`Template save error: ${e.message || e}`, 'err');
+            return false;
+          }
+          if (!out?.ok) { st(`Template save error: ${out?.error || 'Unknown error'}`, 'err'); return false; }
+          const p = String(out.project_template_path || out.path || '').trim();
+          if (p) {
+            curTemplatePath = p;
+            const tp = g('tmpl-path'); if (tp) tp.value = p;
+            await refreshTemplateLibrary(p);
+          }
+          curTemplateData = dclone(data);
+          st(`Template saved: ${out?.name || bname(p) || `${TE.name}.json`}`, 'ok');
+          if (PRJ.path) markProjectDirty();
+          return true;
+        }
+        dl(JSON.stringify(data, null, 2), `${TE.name || 'tag_template'}.json`);
+        curTemplateData = dclone(data);
+        st(`Template exported: ${TE.name || 'tag_template'}.json`, 'ok');
+        return true;
+      }
+      function applyTemplateEditor() {
+        const data = teBuildOutput();
+        curTemplateData = dclone(data);
+        loadTmpl(data);
+        if (PRJ.path) markProjectDirty();
+        st('Template applied from editor', 'ok');
+      }
+      function bindTemplateEditor() {
+        const ov = g('te-overlay');
+        if (!ov) return;
+        ov.addEventListener('mousedown', e => { if (e.target === ov) closeTemplateEditor(); });
+        window.addEventListener('mousemove', teOnMouseMove);
+        window.addEventListener('mouseup', teOnMouseUp);
+
+        g('b-te-open').onclick = () => openTemplateEditor('current');
+        g('te-close').onclick = () => closeTemplateEditor();
+        g('te-new').onclick = () => openTemplateEditor('new');
+        g('te-load').onclick = () => openTemplateEditor('current');
+        g('te-apply').onclick = () => applyTemplateEditor();
+        g('te-save').onclick = () => saveTemplateEditor();
+
+        g('te-page').onchange = () => { TE.page = +g('te-page').value; teRenderAll(); };
+        g('te-cw').onchange = () => { TE.canvasW = Math.max(300, +g('te-cw').value || 1280); teRenderAll(); };
+        g('te-ch').onchange = () => { TE.canvasH = Math.max(120, +g('te-ch').value || 720); teRenderAll(); };
+        g('te-name').onchange = () => { TE.name = cleanName(g('te-name').value || 'tag_template').replace(/\.json$/i, ''); g('te-name').value = TE.name; };
+
+        g('te-add-page').onclick = () => {
+          const idx = teNextId(TE.pages, 'template_page-index');
+          const ord = TE.pages.length;
+          TE.pages.push(teDefaultPage(idx, ord));
+          TE.page = idx;
+          teRenderAll();
+        };
+
+        g('te-add-tag').onclick = () => {
+          const id = teNextId(TE.tags, 'tag_template-id');
+          const t = teDefaultTag(id, teCurrentPage());
+          TE.tags.push(t);
+          TE.selEntity = { kind: 'tag', id };
+          teRenderAll();
+        };
+        g('te-del-tag').onclick = () => {
+          if (TE.selEntity?.kind !== 'tag') return;
+          const id = +TE.selEntity.id;
+          TE.tags = TE.tags.filter(t => +t['tag_template-id'] !== id);
+          TE.items = TE.items.filter(it => !(+it['event-window-item-type'] === 1 && +it['event-window-item-type-id'] === id));
+          TE.selEntity = null;
+          if (TE.selItemId && !TE.items.find(it => +it['event-window-item-id'] === +TE.selItemId)) TE.selItemId = null;
+          teRenderAll();
+        };
+
+        g('te-add-label').onclick = () => {
+          const id = teNextId(TE.labels, 'label_template-id');
+          const l = teDefaultLabel(id, teCurrentPage());
+          TE.labels.push(l);
+          TE.selEntity = { kind: 'label', id };
+          teRenderAll();
+        };
+        g('te-del-label').onclick = () => {
+          if (TE.selEntity?.kind !== 'label') return;
+          const id = +TE.selEntity.id;
+          TE.labels = TE.labels.filter(l => +l['label_template-id'] !== id);
+          TE.items = TE.items.filter(it => !(+it['event-window-item-type'] === 2 && +it['event-window-item-type-id'] === id));
+          TE.selEntity = null;
+          if (TE.selItemId && !TE.items.find(it => +it['event-window-item-id'] === +TE.selItemId)) TE.selItemId = null;
+          teRenderAll();
+        };
+
+        g('te-add-item').onclick = () => {
+          if (!TE.selEntity) { st('Select a tag or label first', 'err'); return; }
+          const isTag = TE.selEntity.kind === 'tag';
+          const type = isTag ? 1 : 2;
+          const id = +TE.selEntity.id;
+          const itemId = teNextId(TE.items, 'event-window-item-id');
+          const it = teDefaultItem(type, id, teCurrentPage(), itemId);
+          it['event-window-item-x'] = 20 + (TE.items.length % 8) * 14;
+          it['event-window-item-y'] = 20 + (TE.items.length % 8) * 10;
+          TE.items.push(it);
+          TE.selItemId = itemId;
+          teRenderAll();
+        };
+        g('te-del-item').onclick = () => {
+          if (!TE.selItemId) return;
+          TE.items = TE.items.filter(it => +it['event-window-item-id'] !== +TE.selItemId);
+          TE.selItemId = null;
+          teRenderAll();
+        };
+
+        const onTag = () => {
+          const t = teCurrentEntity(); if (!t || TE.selEntity?.kind !== 'tag') return;
+          t['tag_template-name'] = String(g('te-event-name').value || '').trim() || `Tag ${t['tag_template-id']}`;
+          t['tag_template-short_name'] = String(g('te-event-short').value || '').trim();
+          t['tag_template-hotkey'] = String(g('te-event-hotkey').value || '').trim();
+          t['tag_template-tooltip'] = String(g('te-event-tooltip').value || '').trim();
+          const [r, gc, b] = hexToRgb(g('te-event-color').value);
+          t['tag_template-colour_r'] = r; t['tag_template-colour_g'] = gc; t['tag_template-colour_b'] = b;
+          t['tag_template-manual_start_end'] = !!g('te-event-manual').checked;
+          t['tag_template-default_pre_roll_secs'] = +g('te-event-pre').value || 0;
+          t['tag_template-default_post_roll_secs'] = +g('te-event-post').value || 0;
+          t['tag_template-prefer_reactivation'] = !!g('te-event-react').checked;
+          t['tag_template-note_on_add'] = !!g('te-event-note').checked;
+          teRenderEvents(); teRenderItems(); teRenderCanvas();
+        };
+        ['te-event-name', 'te-event-short', 'te-event-hotkey', 'te-event-tooltip', 'te-event-color', 'te-event-manual', 'te-event-pre', 'te-event-post', 'te-event-react', 'te-event-note']
+          .forEach(id => g(id).oninput = onTag);
+
+        const onLbl = () => {
+          const l = teCurrentEntity(); if (!l || TE.selEntity?.kind !== 'label') return;
+          l['label_template-text'] = String(g('te-lbl-text').value || '').trim() || `Label ${l['label_template-id']}`;
+          l['label_template-short_name'] = String(g('te-lbl-short').value || '').trim();
+          l['label_template-group'] = String(g('te-lbl-group').value || '').trim();
+          l['label_template-hotkey'] = String(g('te-lbl-hotkey').value || '').trim();
+          l['label_template-tooltip'] = String(g('te-lbl-tooltip').value || '').trim();
+          l['global-label'] = !!g('te-lbl-global').checked;
+          teRenderLabels(); teRenderItems(); teRenderCanvas();
+        };
+        ['te-lbl-text', 'te-lbl-short', 'te-lbl-group', 'te-lbl-hotkey', 'te-lbl-tooltip', 'te-lbl-global']
+          .forEach(id => g(id).oninput = onLbl);
+
+        const onItem = () => {
+          const it = teCurrentItem(); if (!it) return;
+          it['event-window-item-x'] = Math.max(0, Math.round(+g('te-it-x').value || 0));
+          it['event-window-item-y'] = Math.max(0, Math.round(+g('te-it-y').value || 0));
+          it['event-window-item-z'] = Math.round(+g('te-it-z').value || 1);
+          it['event-window-item-width'] = Math.max(20, Math.round(+g('te-it-w').value || 120));
+          it['event-window-item-height'] = Math.max(12, Math.round(+g('te-it-h').value || 34));
+          it['event-window-item-button_text_size'] = Math.max(6, Math.round(+g('te-it-fs').value || 11));
+          it['event-window-item-button_background_colour'] = String(g('te-it-bg').value || '#264f82');
+          it['event-window-item-button_text_colour'] = String(g('te-it-fg').value || '#ffffff');
+          it['event-window-item-opacity'] = clamp(g('te-it-op').value, 0, 1);
+          it['event-window-item-button_show_name'] = !!g('te-it-showname').checked;
+          it['event-window-item-button_show_shortcut'] = !!g('te-it-showshortcut').checked;
+          it['event-window-item-button_show_group_name'] = !!g('te-it-showgroup').checked;
+          teRenderItems(); teRenderCanvas();
+        };
+        ['te-it-x', 'te-it-y', 'te-it-z', 'te-it-w', 'te-it-h', 'te-it-fs', 'te-it-bg', 'te-it-fg', 'te-it-op', 'te-it-showname', 'te-it-showshortcut', 'te-it-showgroup']
+          .forEach(id => g(id).oninput = onItem);
+      }
+
+      // export
+      function exportJson() {
+        const out = [...evts.values()].sort((a, b) => a.start - b.start).map(ev => ({
+          id: ev.id, name: ev.name, start: +ev.start.toFixed(3), end: +ev.end.toFixed(3),
+          duration: +(ev.end - ev.start).toFixed(3), period: ev.period, labels: ev.labels.map(l => l.text || l),
+        }));
+        dl(JSON.stringify(out, null, 2), 'timeline.export.json');
+        st(`Exported ${out.length} events`, 'ok');
+      }
+      function cleanName(v) {
+        const t = String(v || '').trim();
+        return t.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/\s+/g, ' ').trim() || 'video';
+      }
+      function normalizePathInput(v) {
+        let t = String(v || '').trim();
+        if (!t) return '';
+        t = t.replace(/\r/g, '\n');
+        const cd = t.match(/(?:^|\n)\s*cd\s+([^\n]+)/);
+        if (cd) t = cd[1];
+        t = t.replace(/\s*\n\s*/g, '');
+        t = t.replace(/^["']|["']$/g, '').trim();
+        t = t.replace(/\\ /g, ' ');
+        return t;
+      }
+      function tagSlug(v) {
+        return cleanName(v).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'event';
+      }
+      function baseName(v) {
+        const n = cleanName(v);
+        return n.replace(/\.[A-Za-z0-9]{1,5}$/, '') || n;
+      }
+      function clipData() {
+        const src = selIds.size ? [...selIds].map(id => evts.get(id)).filter(Boolean) : [...evts.values()];
+        src.sort((a, b) => a.start - b.start);
+        const inName = cleanName(curVideoName || 'video.mp4');
+        const perTypeIdx = new Map();
+        return src.map((ev, i) => {
+          const slug = tagSlug(ev.name || 'event');
+          const idx = (perTypeIdx.get(slug) || 0) + 1;
+          perTypeIdx.set(slug, idx);
+          const pad = String(idx).padStart(3, '0');
+          const stem = `${slug}_${pad}`;
+          return {
+            clip: i + 1,
+            id: ev.id,
+            name: ev.name,
+            tag_name: ev.name,
+            tag_slug: slug,
+            tag_index: idx,
+            file_stem: stem,
+            period: ev.period,
+            labels: ev.labels.map(l => l.text || l),
+            start_sec: +ev.start.toFixed(3),
+            end_sec: +ev.end.toFixed(3),
+            duration_sec: +(ev.end - ev.start).toFixed(3),
+            ffmpeg: `ffmpeg -y -ss ${ev.start.toFixed(3)} -i "${inName}" -t ${(ev.end - ev.start).toFixed(3)} -c:v libx264 -preset veryfast -crf 18 -bf 0 -pix_fmt yuv420p -c:a aac -b:a 160k -movflags +faststart -avoid_negative_ts make_zero "${slug}/${stem}.mp4"`,
+          };
+        });
+      }
+
+      function resolveSourceVideoPath() {
+        if (desktopAPI && curVideoAbsPath) return curVideoAbsPath;
+        const manual = normalizePathInput(srcVideoPathEl?.value);
+        if (manual) return manual;
+        if (curVideoName === 'video.mp4') return './video.mp4';
+        return '';
+      }
+
+      async function pickDesktopVideo() {
+        if (!desktopAPI?.pickVideoFile) {
+          st('Desktop video picker unavailable in this mode', 'err');
+          return;
+        }
+        let out;
+        try {
+          out = await desktopAPI.pickVideoFile();
+        } catch (e) {
+          st(`Video path error: ${e.message || e}`, 'err');
+          return;
+        }
+        if (!out?.ok) {
+          if (!out?.canceled) st('Video path error: no file selected', 'err');
+          return;
+        }
+
+        const abs = String(out.path || '').trim();
+        if (!abs) {
+          st('Video path error: missing path', 'err');
+          return;
+        }
+        if (PRJ.path && !PRJ.suspend) {
+          const prov = await provisionProjectAssets(PRJ.name || 'Project', abs, '', '');
+          if (!prov?.ok) { st(`Video import error: ${prov?.error || 'Unknown error'}`, 'err'); return; }
+          const vPath = String(prov.video_path || abs);
+          loadVideoFromPath(vPath, `Video: ${bname(vPath)}`);
+          return;
+        }
+        loadVideoFromPath(abs, `Video: ${out.name || bname(abs)}`);
+      }
+
+      async function exportClipsViaApi(clips) {
+        const sourcePath = resolveSourceVideoPath();
+        if (!sourcePath) {
+          return { supported: true, error: 'Set "Source video path for ffmpeg export" first.' };
+        }
+
+        if (desktopAPI?.exportClips) {
+          try {
+            const out = await desktopAPI.exportClips({
+              source_video_path: sourcePath,
+              video_name: curVideoName,
+              clips,
+            });
+            if (out?.ok) return { supported: true, ok: true, data: out };
+            return { supported: true, error: out?.error || 'Desktop ffmpeg export failed' };
+          } catch (e) {
+            return { supported: true, error: e?.message || String(e) };
+          }
+        }
+
+        if (!window.fetch) return { supported: false };
+
+        let resp;
+        try {
+          resp = await fetch('/api/export-clips', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              source_video_path: sourcePath,
+              video_name: curVideoName,
+              clips,
+            }),
+          });
+        } catch (_) {
+          return { supported: false };
+        }
+
+        const ctype = String(resp.headers.get('content-type') || '').toLowerCase();
+        if (resp.status === 501) {
+          return { supported: true, error: 'Server does not support clip export API. Start app with: python3 server.py 8000' };
+        }
+        if (resp.status === 404 && !ctype.includes('application/json')) {
+          return { supported: false };
+        }
+
+        let data = {};
+        try {
+          data = ctype.includes('application/json') ? await resp.json() : {};
+        } catch (_) { }
+
+        if (!resp.ok) {
+          return { supported: true, error: data.error || `HTTP ${resp.status}` };
+        }
+
+        return { supported: true, ok: true, data };
+      }
+
+      async function writeTextFile(dirHandle, fileName, text) {
+        const fh = await dirHandle.getFileHandle(fileName, { create: true });
+        const w = await fh.createWritable();
+        await w.write(text);
+        await w.close();
+      }
+
+      async function exportClipsToDesktop(clips) {
+        if (!window.showDirectoryPicker) return false;
+
+        if (!exportDesktopHandle) {
+          exportDesktopHandle = await window.showDirectoryPicker({
+            id: 'latchr_export_dir',
+            mode: 'readwrite',
+            startIn: 'desktop',
+          });
+        }
+
+        const root = await exportDesktopHandle.getDirectoryHandle(EXPORT_ROOT_DIR, { create: true });
+        const videoDirName = baseName(curVideoName || 'video');
+        const vdir = await root.getDirectoryHandle(videoDirName, { create: true });
+
+        const clipsJson = JSON.stringify(clips, null, 2);
+        const sh = [
+          '#!/usr/bin/env bash',
+          'set -euo pipefail',
+          `INPUT="${cleanName(curVideoName || 'video.mp4')}"`,
+          '',
+          ...clips.map(c => `mkdir -p "${c.tag_slug}" && ffmpeg -y -ss ${c.start_sec.toFixed(3)} -i "$INPUT" -t ${(c.end_sec - c.start_sec).toFixed(3)} -c:v libx264 -preset veryfast -crf 18 -bf 0 -pix_fmt yuv420p -c:a aac -b:a 160k -movflags +faststart -avoid_negative_ts make_zero "${c.tag_slug}/${c.file_stem}.mp4"`),
+          '',
+        ].join('\n');
+
+        await writeTextFile(vdir, 'clips.json', clipsJson);
+        await writeTextFile(vdir, 'cut_clips.sh', sh);
+        await writeTextFile(vdir, 'README.txt', 'Run cut_clips.sh in terminal from this folder with the input video available.');
+        st(`Exported clips metadata to Desktop/${EXPORT_ROOT_DIR}/${videoDirName}`, 'ok');
+        return true;
+      }
+
+      async function exportClips() {
+        const clips = clipData();
+        const api = await exportClipsViaApi(clips);
+        if (api?.ok) {
+          const out = api.data?.output_dir || EXPORT_DESKTOP_ROOT;
+          const made = Number(api.data?.created || 0);
+          const fail = Number(api.data?.failed || 0);
+          if (fail > 0) st(`Exported ${made} clips (${fail} failed) -> ${out}`, 'err');
+          else st(`Exported ${made} clips -> ${out}`, 'ok');
+          return;
+        }
+        if (api?.supported && api?.error) {
+          st(`FFmpeg export: ${api.error}`, 'err');
+          if (desktopAPI) return;
+        }
+
+        try {
+          const saved = await exportClipsToDesktop(clips);
+          if (saved) return;
+        } catch (e) {
+          st(`Desktop export failed: ${e.message}`, 'err');
+        }
+
+        // Fallback: browser modal + copy/download
+        g('mpre').textContent = JSON.stringify(clips, null, 2);
+        g('overlay').classList.add('on');
+        dl(JSON.stringify(clips, null, 2), 'clips.export.json');
+      }
+      function dl(text, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; a.click(); URL.revokeObjectURL(a.href); }
+
+      const RW_KEY = 'latchr_right_width_px';
+      const TH_KEY = 'latchr_timeline_height_px';
+      function setRightPanelWidth(px) {
+        const mW = mainEl?.clientWidth || 0;
+        const min = 220;
+        const max = Math.max(min + 60, Math.floor(mW * 0.7));
+        const w = Math.max(min, Math.min(+px || 320, max));
+        document.documentElement.style.setProperty('--RW', w + 'px');
+        try { localStorage.setItem(RW_KEY, String(Math.round(w))); } catch (_) { }
+      }
+      function setTimelinePanelHeight(px) {
+        const rootH = rootEl?.clientHeight || window.innerHeight || 800;
+        const splitH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--TS')) || 8;
+        const min = 120;
+        const mainMin = 220;
+        const max = Math.max(min, Math.floor(rootH - mainMin - splitH));
+        const h = Math.max(min, Math.min(+px || 200, max));
+        document.documentElement.style.setProperty('--TH', `${Math.round(h)}px`);
+        try { localStorage.setItem(TH_KEY, String(Math.round(h))); } catch (_) { }
+        try { tl?.redraw(); } catch (_) { }
+      }
+      function initSplitter() {
+        if (!splitEl || !mainEl) return;
+        let sx = 0, sw = 0, drag = false;
+        const saved = +localStorage.getItem(RW_KEY);
+        setRightPanelWidth(isFinite(saved) && saved > 0 ? saved : 320);
+
+        const mm = e => {
+          if (!drag) return;
+          const dx = e.clientX - sx;
+          setRightPanelWidth(sw - dx);
+        };
+        const mu = () => {
+          if (!drag) return;
+          drag = false;
+          splitEl.classList.remove('drag');
+          document.documentElement.classList.remove('col-resize');
+        };
+        splitEl.addEventListener('mousedown', e => {
+          drag = true;
+          sx = e.clientX;
+          const cs = getComputedStyle(document.documentElement).getPropertyValue('--RW');
+          sw = parseFloat(cs) || 320;
+          splitEl.classList.add('drag');
+          document.documentElement.classList.add('col-resize');
+          e.preventDefault();
+        });
+        window.addEventListener('mousemove', mm);
+        window.addEventListener('mouseup', mu);
+        window.addEventListener('resize', () => setRightPanelWidth(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--RW')) || 320));
+      }
+      function initTimelineSplitter() {
+        if (!tlSplitEl || !tlRowEl || !rootEl) return;
+        let sy = 0, sh = 0, drag = false;
+        const saved = +localStorage.getItem(TH_KEY);
+        setTimelinePanelHeight(isFinite(saved) && saved > 0 ? saved : 200);
+
+        const mm = e => {
+          if (!drag) return;
+          const dy = e.clientY - sy;
+          setTimelinePanelHeight(sh - dy);
+        };
+        const mu = () => {
+          if (!drag) return;
+          drag = false;
+          tlSplitEl.classList.remove('drag');
+          document.documentElement.classList.remove('row-resize');
+        };
+        tlSplitEl.addEventListener('mousedown', e => {
+          drag = true;
+          sy = e.clientY;
+          const cs = getComputedStyle(document.documentElement).getPropertyValue('--TH');
+          sh = parseFloat(cs) || 200;
+          tlSplitEl.classList.add('drag');
+          document.documentElement.classList.add('row-resize');
+          e.preventDefault();
+        });
+        window.addEventListener('mousemove', mm);
+        window.addEventListener('mouseup', mu);
+        window.addEventListener('resize', () => setTimelinePanelHeight(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--TH')) || 200));
+      }
+
+      async function pickJsonPath(titleText, startDir) {
+        if (!desktopAPI?.pickJsonFile) {
+          st('Desktop JSON picker unavailable in this mode', 'err');
+          return '';
+        }
+        let out;
+        try {
+          out = await desktopAPI.pickJsonFile(titleText || 'Select JSON file', startDir || '');
+        } catch (e) {
+          st(`JSON picker error: ${e.message || e}`, 'err');
+          return '';
+        }
+        if (!out?.ok) return '';
+        return String(out.path || '').trim();
+      }
+      function chooseVideoImportMode() {
+        let raw = 'copy';
+        try {
+          raw = (typeof window.prompt === 'function'
+            ? window.prompt('Video import mode for LatchR project package:\nType "copy" (recommended) or "move".', 'copy')
+            : 'copy');
+        } catch (_) { raw = 'copy'; }
+        if (raw === null) raw = 'copy';
+        const v = String(raw || '').trim().toLowerCase();
+        if (v === 'move') return 'move';
+        return 'copy';
+      }
+      function askProjectName(preferred) {
+        const seed = projectNameSeed(preferred);
+        let raw = seed;
+        try {
+          raw = (typeof window.prompt === 'function'
+            ? window.prompt('Project name (example: Salvador vs Burgos):', seed)
+            : seed);
+        } catch (_) { raw = seed; }
+        if (raw === null) return '';
+        const name = sanitizeProjectName(raw);
+        return name || seed;
+      }
+      async function createProjectInteractive() {
+        if (!desktopAPI) {
+          st('Project feature requires desktop mode', 'err');
+          return false;
+        }
+        hideStartScreen();
+        st('Step 1/6: choose source video', 'ok');
+        let videoPick;
+        try { videoPick = await desktopAPI.pickVideoFile(); } catch (e) { st(`Video picker error: ${e.message || e}`, 'err'); return false; }
+        if (!videoPick?.ok) {
+          st('Create session canceled');
+          showStartScreen();
+          return false;
+        }
+
+        st('Step 2/6: set project name', 'ok');
+        const videoSeed = sanitizeProjectName(baseName(bname(videoPick.path || videoPick.name || '')));
+        const name = askProjectName(videoSeed || PRJ.name || 'Project');
+        if (!name) {
+          st('Create session canceled');
+          showStartScreen();
+          return false;
+        }
+        PRJ.name = name;
+        if (prjNameEl) prjNameEl.value = PRJ.name;
+
+        st('Step 3/6: choose video import mode (copy/move)', 'ok');
+        const videoMode = chooseVideoImportMode();
+        if (!videoMode) {
+          st('Create session canceled');
+          showStartScreen();
+          return false;
+        }
+
+        st('Step 4/6: choose tag template JSON', 'ok');
+        const tmplPath = await pickJsonPath('Select Tag Template JSON', latchrTemplatesDir);
+        if (!tmplPath) {
+          st('Create session canceled');
+          showStartScreen();
+          return false;
+        }
+        st('Step 5/6: choose timeline JSON', 'ok');
+        const tlPath = await pickJsonPath('Select Timeline JSON', latchrRootPath);
+        if (!tlPath) {
+          st('Create session canceled');
+          showStartScreen();
+          return false;
+        }
+
+        st('Step 6/6: create project workspace in LatchR', 'ok');
+        const prov = await provisionProjectAssets(name, videoPick.path, tmplPath, tlPath, videoMode);
+        if (!prov?.ok) { st(`Project setup error: ${prov?.error || 'Unknown error'}`, 'err'); return false; }
+
+        PRJ.suspend = true;
+        const vOk = loadVideoFromPath(prov.video_path || videoPick.path, `Video: ${bname(prov.video_path || videoPick.path)}`);
+        const tOk = await loadTmplPath(prov.template_path || tmplPath);
+        const lOk = await loadTimelinePath(prov.timeline_path || tlPath);
+        PRJ.suspend = false;
+        if (!vOk || !tOk || !lOk) { st('Project creation failed: could not load selected files', 'err'); return false; }
+
+        setProjectContext(prov.project_name || name, prov.project_path || '');
+        const saved = await saveProjectFile(false);
+        if (!saved) return false;
+        st(`Project created in ${latchrRootPath}`, 'ok');
+        return true;
+      }
+      async function openProjectInteractive() {
+        if (!desktopAPI?.openProject) {
+          st('Project open requires desktop mode', 'err');
+          return false;
+        }
+        hideStartScreen();
+        st('Opening session project...', 'ok');
+        let out;
+        try {
+          out = await desktopAPI.openProject();
+        } catch (e) {
+          st(`Open project error: ${e.message || e}`, 'err');
+          return false;
+        }
+        if (!out?.ok) {
+          if (!out?.canceled) st(`Open project error: ${out?.error || 'Unknown error'}`, 'err');
+          return false;
+        }
+        const data = out.data || {};
+        const pPath = String(out.path || '').trim();
+        const pName = String(data.project_name || '').trim() || bname(pPath).replace(/\.json$/i, '') || 'Project';
+        const vp = String(data.video_path || '').trim();
+        const tp = String(data.template_path || '').trim();
+        const tlp = String(data.timeline_path || '').trim();
+        const prov = await provisionProjectAssets(pName, vp, tp, tlp);
+        if (!prov?.ok) { st(`Project setup error: ${prov?.error || 'Unknown error'}`, 'err'); return false; }
+
+        PRJ.suspend = true;
+        setProjectContext(prov.project_name || pName, prov.project_path || pPath);
+
+        let hasError = false;
+        const videoToLoad = String(prov.video_path || vp || '').trim();
+        if (videoToLoad) {
+          if (!loadVideoFromPath(videoToLoad, `Video: ${bname(videoToLoad)}`)) hasError = true;
+        }
+
+        const templateToLoad = String(prov.template_path || tp || '').trim();
+        if (templateToLoad) {
+          const ok = await loadTmplPath(templateToLoad);
+          if (!ok) hasError = true;
+        }
+
+        if (Array.isArray(data.events)) {
+          loadProjectEvents(data.events);
+          curTimelinePath = String(prov.timeline_path || tlp || '').trim();
+        } else {
+          const tlToLoad = String(prov.timeline_path || tlp || '').trim();
+          if (tlToLoad) {
+            const ok = await loadTimelinePath(tlToLoad);
+            if (!ok) hasError = true;
+          } else {
+            hasError = true;
+            st('Project has no timeline/events', 'err');
+          }
+        }
+
+        PRJ.suspend = false;
+        await refreshTemplateLibrary(templateToLoad);
+        await saveProjectFile(false);
+        PRJ.dirty = false;
+        setProjectInfo();
+        if (hasError) st(`Project loaded with errors: ${prov.project_name || pName}`, 'err');
+        else st(`Project opened: ${prov.project_name || pName}`, 'ok');
+        return true;
+      }
+      async function saveProjectInteractive() {
+        if (!desktopAPI) {
+          st('Project save requires desktop mode', 'err');
+          return false;
+        }
+        if (!PRJ.path) {
+          const name = askProjectName(projectNameSeed());
+          if (!name) { st('Save canceled'); return false; }
+          PRJ.name = name;
+          if (prjNameEl) prjNameEl.value = PRJ.name;
+          setProjectInfo();
+        } else if (!PRJ.name) {
+          PRJ.name = projectNameSeed();
+          if (prjNameEl) prjNameEl.value = PRJ.name;
+          setProjectInfo();
+        }
+        st('Saving project...', 'ok');
+        if (!PRJ.path) {
+          const prov = await provisionProjectAssets(
+            PRJ.name || 'Project',
+            curVideoAbsPath || '',
+            curTemplatePath || '',
+            curTimelinePath || '',
+            'copy',
+          );
+          if (!prov?.ok) {
+            st(`Project setup error: ${prov?.error || 'Unknown error'}`, 'err');
+            return false;
+          }
+          if (prov.video_path) {
+            curVideoAbsPath = String(prov.video_path);
+            curVideoName = bname(curVideoAbsPath) || curVideoName;
+            if (srcVideoPathEl) srcVideoPathEl.value = curVideoAbsPath;
+          }
+          if (prov.template_path) {
+            curTemplatePath = String(prov.template_path);
+            const tpi = g('tmpl-path'); if (tpi) tpi.value = curTemplatePath;
+          }
+          if (prov.timeline_path) curTimelinePath = String(prov.timeline_path);
+          setProjectContext(prov.project_name || PRJ.name, prov.project_path || '');
+        }
+        return saveProjectFile(false);
+      }
+      async function startNewSessionFromHome() {
+        hideStartScreen();
+        await createProjectInteractive();
+      }
+      async function startOpenSessionFromHome() {
+        hideStartScreen();
+        const ok = await openProjectInteractive();
+        if (!ok) showStartScreen();
+      }
+      function backToHomeScreen() {
+        if (T.aKey) clearActiveEvent();
+        showStartScreen();
+        st('Home. Choose: Create New Session or Choose Session.', 'ok');
+      }
+
+      // bindings
+      function bind() {
+        bindTemplateEditor();
+        const toolsBtn = g('b-tools');
+        const toolsPanel = g('toolbar-dd');
+        if (toolsBtn && toolsPanel) {
+          toolsBtn.onclick = e => {
+            e.stopPropagation();
+            toggleToolsMenu();
+          };
+          toolsPanel.onclick = e => e.stopPropagation();
+          document.addEventListener('click', () => closeToolsMenu());
+        }
+
+        g('b-start-new').onclick = () => startNewSessionFromHome();
+        g('b-start-open').onclick = () => startOpenSessionFromHome();
+        g('b-new-prj').onclick = () => createProjectInteractive();
+        g('b-open-prj').onclick = () => openProjectInteractive();
+        g('b-save-prj').onclick = () => saveProjectInteractive();
+        g('b-home').onclick = () => backToHomeScreen();
+        if (prjNameEl) {
+          prjNameEl.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); prjNameEl.blur(); } };
+          prjNameEl.onchange = () => {
+            const n = sanitizeProjectName(prjNameEl.value);
+            if (!n) {
+              prjNameEl.value = PRJ.name || '';
+              return;
+            }
+            if (n === PRJ.name) {
+              prjNameEl.value = n;
+              return;
+            }
+            PRJ.name = n;
+            prjNameEl.value = n;
+            setProjectInfo();
+            if (PRJ.path) markProjectDirty();
+          };
+        }
+
+        g('f-session').onchange = async e => {
+          const f = e.target.files[0]; if (!f) return; e.target.value = '';
+          const p = String(f.path || '').trim();
+          if (p) {
+            const ok = await loadTimelinePath(p);
+            if (ok) st(`Timeline loaded: ${bname(curTimelinePath || p)}`, 'ok');
+            return;
+          }
+          try {
+            const d = JSON.parse(await f.text());
+            if (!applyTimelineData(d)) { st('Timeline error: Unsupported JSON format', 'err'); return; }
+            markProjectDirty();
+          } catch (err) {
+            st('Session error: ' + err.message, 'err');
+          }
+        };
+        g('f-tmpl').onchange = async e => {
+          const f = e.target.files[0]; if (!f) return; e.target.value = '';
+          const p = String(f.path || '').trim();
+          if (p) { await loadTmplPath(p); return; }
+          try {
+            loadTmpl(JSON.parse(await f.text()));
+            curTemplatePath = '';
+            const tpi = g('tmpl-path'); if (tpi) tpi.value = '';
+            await refreshTemplateLibrary('');
+            markProjectDirty();
+          } catch (err) {
+            st('Template error: ' + err.message, 'err');
+          }
+        };
+        g('b-load-tmpl-path').onclick = () => loadTmplPath(g('tmpl-path').value);
+        g('tmpl-path').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); loadTmplPath(g('tmpl-path').value); } };
+        g('b-use-tmpl-lib').onclick = () => {
+          const sel = g('tmpl-lib');
+          const p = String(sel?.value || '').trim();
+          if (!p) { st('No template selected from library', 'err'); return; }
+          loadTmplPath(p);
+        };
+        g('f-video').onchange = async e => {
+          const f = e.target.files[0]; if (!f) return; e.target.value = '';
+          const absPath = String(f.path || '').trim();
+          if (desktopAPI && absPath && PRJ.path && !PRJ.suspend) {
+            const prov = await provisionProjectAssets(PRJ.name || 'Project', absPath, '', '');
+            if (!prov?.ok) { st(`Video import error: ${prov?.error || 'Unknown error'}`, 'err'); return; }
+            const vPath = String(prov.video_path || absPath);
+            loadVideoFromPath(vPath, `Video: ${bname(vPath)}`);
+            return;
+          }
+          if (localUrl) URL.revokeObjectURL(localUrl);
+          localUrl = URL.createObjectURL(f);
+          curVideoName = f.name || 'video.mp4';
+          curVideoAbsPath = '';
+          if (srcVideoPathEl) {
+            if (absPath) {
+              curVideoAbsPath = absPath;
+              srcVideoPathEl.value = absPath;
+            }
+            else if (!String(srcVideoPathEl.value || '').trim()) srcVideoPathEl.value = f.name || '';
+          }
+          vid.src = localUrl;
+          markProjectDirty();
+          st(`Video: ${f.name} (set source path for ffmpeg export)`, 'ok');
+        };
+        g('b-video-path').onclick = () => pickDesktopVideo();
+        g('b-defvid').onclick = () => useDefaultVideo();
+        vid.ontimeupdate = () => ph(vid.currentTime || 0);
+        vid.onloadedmetadata = () => {
+          vidDur = vid.duration || DFL;
+          tlBounds(true);
+          tlRefresh();
+          renderTable();
+          ph(0);
+          st(`Ready — ${fmt(vid.duration)}`, 'ok');
+        };
+        vid.onerror = () => { const c = vid.error?.code; const m = { 1: 'Aborted', 2: 'Network error', 3: 'Decode error (try converting to H.264 mp4)', 4: 'Format not supported' }; st(`Video error: ${m[c] || 'unknown'} (code ${c})`, 'err'); };
+        document.querySelectorAll('.sk[data-s]').forEach(b => b.onclick = () => seek(now() + +b.dataset.s));
+        g('spd').onchange = () => { vid.playbackRate = +g('spd').value; };
+        g('b-clip').onclick = () => { const ev = evts.get(selEvId); if (ev) playClip(ev); else st('Select an event first', 'err'); };
+        g('b-lock').onclick = () => { locked = !locked; g('b-lock').textContent = locked ? '🔓 Unlock' : '🔒 Lock'; g('b-lock').className = locked ? 'btn lck' : 'btn'; st(locked ? 'Locked' : 'Unlocked'); };
+        g('b-json').onclick = exportJson;
+        g('b-clips').onclick = () => { exportClips(); };
+        if (srcVideoPathEl) {
+          srcVideoPathEl.addEventListener('input', () => { curVideoAbsPath = ''; });
+        }
+        g('chk-all').onchange = function () { evts.forEach((_, id) => this.checked ? selIds.add(id) : selIds.delete(id)); renderTable(); };
+        g('chk-sel').onchange = function () { filterOn = this.checked; tlRefresh(); };
+        g('b-sel-types').onclick = () => selectMarkedTypes();
+        g('b-clear-sel').onclick = () => clearSelection();
+        g('b-clear-types').onclick = () => clearTypeMarks();
+        g('event-x').onclick = clearActiveEvent;
+        g('b-mc').onclick = () => g('overlay').classList.remove('on');
+        g('overlay').onclick = e => { if (e.target === g('overlay')) g('overlay').classList.remove('on'); };
+        g('b-copy').onclick = () => navigator.clipboard.writeText(g('mpre').textContent).then(() => st('Copied!', 'ok'));
+        document.onkeydown = e => {
+          if (e.key === 'Escape') {
+            closeToolsMenu();
+            if (g('te-overlay')?.classList.contains('on')) closeTemplateEditor();
+            return;
+          }
+          if (g('te-overlay')?.classList.contains('on')) return;
+          if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+          if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+          if (selIds.size) { selIds.forEach(id => delEv(id)); selIds.clear(); }
+          else if (selEvId) delEv(selEvId);
+          markProjectDirty();
+          tlRefresh(); renderTable(); st('Deleted');
+        };
+      }
+
+      function init() {
+        if (typeof vis === 'undefined') { st('vis-timeline CDN failed to load', 'err'); return; }
+        initSplitter();
+        initTimelineSplitter();
+        initTl(); bind();
+        if (prjNameEl) prjNameEl.value = PRJ.name || '';
+        setProjectInfo();
+        if (desktopAPI && srcVideoPathEl) {
+          srcVideoPathEl.readOnly = true;
+          srcVideoPathEl.title = 'Auto-filled in desktop mode via video picker or project file';
+          const tp = g('tmpl-path');
+          if (tp) tp.value = DEFAULT_TEMPLATE_PATH;
+        }
+        if (!desktopAPI?.pickVideoFile) {
+          const bp = g('b-video-path');
+          if (bp) bp.style.display = 'none';
+        }
+        if (desktopAPI) {
+          refreshTemplateLibrary(DEFAULT_TEMPLATE_PATH);
+          st('Desktop mode. Choose: Create New Session or Choose Session.', 'ok');
+          showStartScreen();
+          return;
+        }
+        st('Ready. Load session/timeline and template.', 'ok');
+        const p = g('tmpl-path')?.value;
+        if (p) loadTmplPath(p);
+      }
+
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+      else init();
+
+    })();
+  </script>
+</body>
+
+</html>

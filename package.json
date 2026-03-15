@@ -1,0 +1,18 @@
+{
+  "name": "latchr",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "LatchR desktop video tagging app (Electron + vis-timeline)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "check": "node scripts/check.js",
+    "package:mac": "node scripts/package-macos-app.js",
+    "package:mac:zip": "npm run package:mac && node scripts/package-macos-zip.js",
+    "install:mac": "node scripts/install-macos-app.js"
+  },
+  "devDependencies": {
+    "electron": "^35.2.1"
+  }
+}

@@ -1,0 +1,54 @@
+# Node / Electron
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+out/
+release/
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Runtime exports / generated data
+*.export.json
+clips.export.json
+*.log
+tmp/
+temp/
+
+# Local media (avoid committing match videos)
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.m4v
+*.ts
+*.mts
+*.m2ts
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+.Rhistory
+
+# Local agent / workspace-only files
+.agents/
+agents
+AGENTS.md
+sport-video-tagging-prototype/
+
+# Editors / IDE
+.idea/
+.vscode/
+
+# Python artifacts (legacy helper scripts)
+__pycache__/
+*.pyc

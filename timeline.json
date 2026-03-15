@@ -1,0 +1,6 @@
+[
+  { "id": "evt_001", "start": 2.0, "end": 6.5, "label": "Kick chase" },
+  { "id": "evt_002", "start": 8.25, "end": 12.8, "label": "Defensive line press" },
+  { "id": "evt_003", "start": 14.4, "end": 17.1, "label": "Breakaway run" },
+  { "id": "evt_004", "start": 19.7, "end": 24.0, "label": "Shot on target" }
+]

@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose an improvement to Tagger
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What workflow problem are you trying to solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe expected behavior and UI
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workaround or alternative approach?
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Analyst impact
+      description: Time saved, errors reduced, or other measurable impact
