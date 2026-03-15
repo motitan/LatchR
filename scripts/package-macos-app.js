@@ -11,6 +11,7 @@ const APP_BUNDLE = `${APP_NAME}.app`;
 const APP_BIN_DIR = 'bin';
 const APP_LIB_DIR = 'lib';
 const APP_ICON_FILE = 'latchr-project.icns';
+const APP_ICON_NAME = path.basename(APP_ICON_FILE, path.extname(APP_ICON_FILE));
 const LEGACY_DOC_EXTENSION = 'sporttagger';
 const PROJECT_DOC_EXTENSION = 'latchr';
 const LEGACY_DOC_UTI = 'com.sporttagger.project';
@@ -19,6 +20,7 @@ const ELECTRON_APP = path.join(ROOT, 'node_modules', 'electron', 'dist', 'Electr
 const OUTPUT_APP = path.join(DIST_DIR, APP_BUNDLE);
 const STAGE_DIR = path.join(DIST_DIR, '.app-stage');
 const PACKAGE_DOC_ICON_FILE = APP_ICON_FILE;
+const PACKAGE_DOC_ICON_NAME = APP_ICON_NAME;
 const PACKAGE_DOC_ICON_PATH = path.join(ROOT, 'resources', PACKAGE_DOC_ICON_FILE);
 const SYSTEM_LIBRARY_PREFIXES = ['/System/Library/', '/usr/lib/'];
 const FFMPEG_PATH_CANDIDATES = [
@@ -69,7 +71,7 @@ function configureProjectPackageDocumentType(plistPath) {
   runPlistCommand(plistPath, 'Add :CFBundleDocumentTypes:0:CFBundleTypeRole string Editor');
   runPlistCommand(plistPath, 'Add :CFBundleDocumentTypes:0:LSHandlerRank string Owner');
   runPlistCommand(plistPath, 'Add :CFBundleDocumentTypes:0:LSTypeIsPackage bool true');
-  runPlistCommand(plistPath, `Add :CFBundleDocumentTypes:0:CFBundleTypeIconFile string ${PACKAGE_DOC_ICON_FILE}`);
+  runPlistCommand(plistPath, `Add :CFBundleDocumentTypes:0:CFBundleTypeIconFile string ${PACKAGE_DOC_ICON_NAME}`);
   runPlistCommand(plistPath, 'Add :CFBundleDocumentTypes:0:CFBundleTypeExtensions array');
   runPlistCommand(plistPath, `Add :CFBundleDocumentTypes:0:CFBundleTypeExtensions:0 string ${PROJECT_DOC_EXTENSION}`);
   runPlistCommand(plistPath, `Add :CFBundleDocumentTypes:0:CFBundleTypeExtensions:1 string ${LEGACY_DOC_EXTENSION}`);
@@ -85,7 +87,7 @@ function configureProjectPackageDocumentType(plistPath) {
   runPlistCommand(plistPath, 'Add :UTExportedTypeDeclarations:0:UTTypeConformsTo array');
   runPlistCommand(plistPath, 'Add :UTExportedTypeDeclarations:0:UTTypeConformsTo:0 string com.apple.package');
   runPlistCommand(plistPath, 'Add :UTExportedTypeDeclarations:0:UTTypeConformsTo:1 string public.directory');
-  runPlistCommand(plistPath, `Add :UTExportedTypeDeclarations:0:UTTypeIconFile string ${PACKAGE_DOC_ICON_FILE}`);
+  runPlistCommand(plistPath, `Add :UTExportedTypeDeclarations:0:UTTypeIconFile string ${PACKAGE_DOC_ICON_NAME}`);
   runPlistCommand(plistPath, 'Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification dict');
   runPlistCommand(plistPath, 'Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension array');
   runPlistCommand(plistPath, `Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0 string ${PROJECT_DOC_EXTENSION}`);
@@ -99,7 +101,7 @@ function configureProjectPackageDocumentType(plistPath) {
   runPlistCommand(plistPath, 'Add :UTImportedTypeDeclarations:0:UTTypeConformsTo array');
   runPlistCommand(plistPath, 'Add :UTImportedTypeDeclarations:0:UTTypeConformsTo:0 string com.apple.package');
   runPlistCommand(plistPath, 'Add :UTImportedTypeDeclarations:0:UTTypeConformsTo:1 string public.directory');
-  runPlistCommand(plistPath, `Add :UTImportedTypeDeclarations:0:UTTypeIconFile string ${PACKAGE_DOC_ICON_FILE}`);
+  runPlistCommand(plistPath, `Add :UTImportedTypeDeclarations:0:UTTypeIconFile string ${PACKAGE_DOC_ICON_NAME}`);
   runPlistCommand(plistPath, 'Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification dict');
   runPlistCommand(plistPath, 'Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension array');
   runPlistCommand(plistPath, `Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0 string ${LEGACY_DOC_EXTENSION}`);
@@ -353,7 +355,7 @@ function packageApp() {
   setPlistValue(plistPath, 'CFBundleName', APP_NAME);
   setPlistValue(plistPath, 'CFBundleExecutable', APP_NAME);
   setPlistValue(plistPath, 'CFBundleIdentifier', 'com.latchr.app');
-  setPlistValue(plistPath, 'CFBundleIconFile', APP_ICON_FILE);
+  setPlistValue(plistPath, 'CFBundleIconFile', APP_ICON_NAME);
   setPlistValue(plistPath, 'CFBundleShortVersionString', pkg.version || '0.0.0');
   setPlistValue(plistPath, 'CFBundleVersion', pkg.version || '0.0.0');
   configureProjectPackageDocumentType(plistPath);

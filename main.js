@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, nativeImage } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -46,6 +46,33 @@ const PROJECT_PACKAGE_ICON_CACHE = new Set();
 let projectPackageBackfillPromise = null;
 let projectPackageWarningShown = false;
 let projectPackageIconSourceCache = '';
+
+function resolveRuntimeAppIconPath() {
+  const candidates = [
+    path.join(process.resourcesPath || '', 'latchr-project.icns'),
+    path.join(ROOT_DIR, 'resources', 'latchr-project.png'),
+    path.join(ROOT_DIR, 'resources', 'latchr-project.icns'),
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    try {
+      if (fs.existsSync(candidate)) return candidate;
+    } catch (_) { }
+  }
+  return '';
+}
+
+function applyRuntimeDockIcon() {
+  if (process.platform !== 'darwin' || !app.dock || typeof app.dock.setIcon !== 'function') {
+    return;
+  }
+  const iconPath = resolveRuntimeAppIconPath();
+  if (!iconPath) return;
+  try {
+    const icon = nativeImage.createFromPath(iconPath);
+    if (!icon.isEmpty()) app.dock.setIcon(icon);
+  } catch (_) { }
+}
 
 function uniqueValues(values) {
   const seen = new Set();
@@ -3707,12 +3734,14 @@ async function handleConvertVideoMp4(payload, onProgress) {
 }
 
 function createWindow() {
+  const windowIconPath = resolveRuntimeAppIconPath();
   const win = new BrowserWindow({
     width: 1600,
     height: 980,
     minWidth: 1100,
     minHeight: 700,
     autoHideMenuBar: true,
+    icon: windowIconPath || undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -3835,6 +3864,7 @@ app.commandLine.appendSwitch('disable-gpu-compositing');
 
 app.whenReady().then(() => {
   ensureLatchrWorkspace().catch(() => { });
+  applyRuntimeDockIcon();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
