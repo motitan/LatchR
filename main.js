@@ -1954,12 +1954,12 @@ async function probeReadableDurationSec(ffmpegPath, sourceVideo) {
     '0:a?',
     '-c',
     'copy',
-    '-f',
-    'null',
-    '-',
     '-progress',
     'pipe:1',
     '-nostats',
+    '-f',
+    'null',
+    '-',
   ], NaN, null);
   const outSec = Number(run && run.out_sec);
   return {
@@ -3028,6 +3028,10 @@ function ffconcatPath(pathText) {
   return String(pathText || '').replace(/\\/g, '/').replace(/'/g, "'\\''");
 }
 
+function shSingleQuote(text) {
+  return `'${String(text || '').replace(/'/g, `'\\''`)}'`;
+}
+
 function exportOutputDirForVideo(sourceVideo, videoNameRaw) {
   const videoName = sanitizeName(videoNameRaw || path.basename(sourceVideo), 'video');
   const videoDir = sanitizeName(path.parse(videoName).name, 'video');
@@ -3312,8 +3316,8 @@ async function handleExportClips(payload) {
   const shLines = [
     '#!/usr/bin/env bash',
     'set -euo pipefail',
-    `INPUT="${sourceVideo.replace(/"/g, '\\"')}"`,
-    `FFMPEG="${String(ff.ffmpeg || 'ffmpeg').replace(/"/g, '\\"')}"`,
+    `INPUT=${shSingleQuote(sourceVideo)}`,
+    `FFMPEG=${shSingleQuote(String(ff.ffmpeg || 'ffmpeg'))}`,
     'OUT_DIR="$(cd "$(dirname "$0")" && pwd)"',
     '',
   ];
@@ -3405,89 +3409,91 @@ async function handleExportMerged(payload) {
   await fsp.mkdir(mergeTmpDir, { recursive: true });
   const partFiles = [];
 
-  for (let i = 0; i < jobs.length; i += 1) {
-    const job = jobs[i];
-    const partName = `part_${String(i + 1).padStart(3, '0')}.mp4`;
-    const partPath = path.join(mergeTmpDir, partName);
-    const args = buildClipEncodeArgs(sourceVideo, job.startSec, job.endSec, partPath);
-    const run = await runCommand(ff.ffmpeg, args);
-    if (run.code === 0 && fs.existsSync(partPath)) {
-      partFiles.push(partPath);
-    } else {
-      failed.push({
-        clip: job.clipNum,
-        name: job.fileStem,
-        tag: job.tagSlug,
-        error: tailText(run.stderr || run.stdout || run.error || 'ffmpeg failed'),
-      });
+  try {
+    for (let i = 0; i < jobs.length; i += 1) {
+      const job = jobs[i];
+      const partName = `part_${String(i + 1).padStart(3, '0')}.mp4`;
+      const partPath = path.join(mergeTmpDir, partName);
+      const args = buildClipEncodeArgs(sourceVideo, job.startSec, job.endSec, partPath);
+      const run = await runCommand(ff.ffmpeg, args);
+      if (run.code === 0 && fs.existsSync(partPath)) {
+        partFiles.push(partPath);
+      } else {
+        failed.push({
+          clip: job.clipNum,
+          name: job.fileStem,
+          tag: job.tagSlug,
+          error: tailText(run.stderr || run.stdout || run.error || 'ffmpeg failed'),
+        });
+      }
     }
-  }
 
-  if (!partFiles.length) {
+    if (!partFiles.length) {
+      return {
+        ok: false,
+        error: 'Could not render clip segments for merge',
+        output_dir: outDir,
+        failed: failed.length,
+        errors: failed,
+        ffmpeg: ff.ffmpeg,
+      };
+    }
+    if (failed.length) {
+      return {
+        ok: false,
+        error: `Could not render all segments for merge (${failed.length} failed)`,
+        output_dir: outDir,
+        created_parts: partFiles.length,
+        failed: failed.length,
+        errors: failed,
+        ffmpeg: ff.ffmpeg,
+      };
+    }
+
+    const outputStem = sanitizeName(payload && payload.output_name ? payload.output_name : 'merged', 'merged')
+      .replace(/\.mp4$/i, '');
+    const mergedPath = uniquePathIfExists(path.join(outDir, `${outputStem}.mp4`));
+    const concatListPath = path.join(mergeTmpDir, 'concat_list.txt');
+    const concatLines = partFiles.map((partPath) => `file '${ffconcatPath(partPath)}'`);
+    await fsp.writeFile(concatListPath, `${concatLines.join('\n')}\n`, 'utf8');
+
+    const mergeArgs = [
+      '-y',
+      '-f',
+      'concat',
+      '-safe',
+      '0',
+      '-i',
+      concatListPath,
+      '-c',
+      'copy',
+      '-movflags',
+      '+faststart',
+      mergedPath,
+    ];
+    const mergedRun = await runCommand(ff.ffmpeg, mergeArgs);
+    if (mergedRun.code !== 0 || !fs.existsSync(mergedPath)) {
+      return {
+        ok: false,
+        error: tailText(mergedRun.stderr || mergedRun.stdout || mergedRun.error || 'ffmpeg merge failed'),
+        output_dir: outDir,
+        ffmpeg: ff.ffmpeg,
+      };
+    }
+
     return {
-      ok: false,
-      error: 'Could not render clip segments for merge',
+      ok: true,
+      mode: 'merged',
+      source_video: sourceVideo,
       output_dir: outDir,
-      failed: failed.length,
-      errors: failed,
-      ffmpeg: ff.ffmpeg,
-    };
-  }
-  if (failed.length) {
-    return {
-      ok: false,
-      error: `Could not render all segments for merge (${failed.length} failed)`,
-      output_dir: outDir,
+      output_file: mergedPath,
       created_parts: partFiles.length,
-      failed: failed.length,
-      errors: failed,
+      failed: 0,
       ffmpeg: ff.ffmpeg,
     };
+  } finally {
+    await fsp.rm(mergeTmpDir, { recursive: true, force: true }).catch(() => { });
   }
-
-  const outputStem = sanitizeName(payload && payload.output_name ? payload.output_name : 'merged', 'merged')
-    .replace(/\.mp4$/i, '');
-  const mergedPath = uniquePathIfExists(path.join(outDir, `${outputStem}.mp4`));
-  const concatListPath = path.join(mergeTmpDir, 'concat_list.txt');
-  const concatLines = partFiles.map((partPath) => `file '${ffconcatPath(partPath)}'`);
-  await fsp.writeFile(concatListPath, `${concatLines.join('\n')}\n`, 'utf8');
-
-  const mergeArgs = [
-    '-y',
-    '-f',
-    'concat',
-    '-safe',
-    '0',
-    '-i',
-    concatListPath,
-    '-c',
-    'copy',
-    '-movflags',
-    '+faststart',
-    mergedPath,
-  ];
-  const mergedRun = await runCommand(ff.ffmpeg, mergeArgs);
-  if (mergedRun.code !== 0 || !fs.existsSync(mergedPath)) {
-    return {
-      ok: false,
-      error: tailText(mergedRun.stderr || mergedRun.stdout || mergedRun.error || 'ffmpeg merge failed'),
-      output_dir: outDir,
-      ffmpeg: ff.ffmpeg,
-    };
-  }
-
-  await fsp.rm(mergeTmpDir, { recursive: true, force: true }).catch(() => { });
-
-  return {
-    ok: true,
-    mode: 'merged',
-    source_video: sourceVideo,
-    output_dir: outDir,
-    output_file: mergedPath,
-    created_parts: partFiles.length,
-    failed: 0,
-    ffmpeg: ff.ffmpeg,
-  };
 }
 
 async function handleConvertVideoMp4(payload, onProgress) {
@@ -3660,6 +3666,7 @@ async function handleConvertVideoMp4(payload, onProgress) {
   let retriedSafe = false;
   let run = await runConvertAttempt(false);
   if (run.code !== 0 || !fs.existsSync(outputPath)) {
+    await fsp.rm(outputPath, { force: true }).catch(() => { });
     return {
       ok: false,
       error: tailText(run.stderr || run.stdout || run.error || 'ffmpeg conversion failed'),
@@ -3686,6 +3693,7 @@ async function handleConvertVideoMp4(payload, onProgress) {
     } catch (_) { }
     run = await runConvertAttempt(true);
     if (run.code !== 0 || !fs.existsSync(outputPath)) {
+      await fsp.rm(outputPath, { force: true }).catch(() => { });
       return {
         ok: false,
         error: tailText(run.stderr || run.stdout || run.error || 'ffmpeg conversion failed in safe mode'),
@@ -3696,6 +3704,7 @@ async function handleConvertVideoMp4(payload, onProgress) {
     if (isLikelyTruncatedDuration(expectedDurationSec, outputDurationSec)) {
       const outputSecText = Number.isFinite(outputDurationSec) ? outputDurationSec.toFixed(1) : 'unknown';
       const expectedSecText = Number.isFinite(expectedDurationSec) ? expectedDurationSec.toFixed(1) : 'unknown';
+      await fsp.rm(outputPath, { force: true }).catch(() => { });
       return {
         ok: false,
         error: `Converted output appears truncated (${outputSecText}s vs expected ${expectedSecText}s). Conversion aborted to protect project video.`,
