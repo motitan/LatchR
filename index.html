@@ -3892,11 +3892,40 @@
   </div>
   <input type="file" id="te-img-picker" accept="image/*" style="display:none" />
 
+  <script src="./js/latchr-shared.js"></script>
+  <script src="./js/latchr-time.js"></script>
+  <script src="./js/latchr-labels.js"></script>
+  <script src="./js/latchr-naming.js"></script>
   <script src="./assets/vendor/vis-timeline/vis-timeline-graph2d.min.js"
     crossorigin="anonymous"></script>
   <script>
     (() => {
       'use strict';
+      // Extracted pure-logic modules (js/latchr-*.js) — loaded before this script.
+      const { normalizePitchXY, normalizeTemplateSchemaKeys, rgbToHex, hexToRgb } = window.LatchRShared;
+      const {
+        r1, r3, p2, fmt, fmtMS, fms, clamp,
+        parseFilterSeconds, parseSignedSeconds, timeRoundForDelta, fmtSignedSeconds,
+      } = window.LatchRTime;
+      const {
+        PITCH_XY_LEGACY_LABEL_GROUP, PITCH_X_LABEL_GROUP, PITCH_Y_LABEL_GROUP,
+        PITCH_X2_LABEL_GROUP, PITCH_Y2_LABEL_GROUP,
+        normalizeEventLabelEntry, serializeEventLabels, eventLabelDisplayText,
+        pitchXYLabelText, pitchHasTrajectory, isPitchXYLabelText, isPitchCoordinateLabel,
+        pitchXYPercentText, pitchXYGroupedLabels, syncEventPitchXYLabel,
+      } = window.LatchRLabels;
+      const {
+        SESSION_NAME_SAFE_DEFAULT, SESSION_NAME_LIBRARY_SAFE_DEFAULT,
+        SESSION_NAME_MODE_COMPETITION, SESSION_NAME_MODE_TRAINING,
+        SESSION_NAME_ORDER_SLOTS, SESSION_NAME_SEPARATOR_OPTIONS,
+        sanitizeProjectName, sessionNamingMode, defaultSessionNamingOrder, defaultSessionNaming,
+        normalizeSessionNamingLibraryValue, defaultSessionNamingLibrary, normalizeSessionNamingLibrary,
+        cloneSessionNamingLibrary, mergeSessionNamingLibraries, sessionNamingLibraryFromNaming,
+        sessionNamingTokens, normalizeSessionNamingToken, normalizeSessionNamingDateInput,
+        normalizeSessionNaming, cloneSessionNaming, sessionNamingDateToken, sessionNamingTokenLabel,
+        sessionNamingTokenValue, sessionNamingPreview, sessionNamingResolvedProjectName,
+        sessionNamingHasData,
+      } = window.LatchRNaming;
 
       const MS = 1000, DFL = 10800;
       const EXPORT_ROOT_DIR = 'video_prototype';
@@ -3964,21 +3993,6 @@
       const VIDEO_CONTROL_SAFE_PAD_PX = 34;
       const PREVIEW_SEEK_FALLBACK_MS = 120;
       const FRAME_EXTRACT_DEBOUNCE_MS = 45;
-      const SESSION_NAME_SAFE_DEFAULT = {
-        mode: 'competition',
-        separator: ' - ',
-        order: ['season', 'competition', 'phase', 'matchup', '', ''],
-        fields: {
-          season: '',
-          competition: '',
-          phase: '',
-          team_a: '',
-          team_b: '',
-          training_mode: '',
-          day_type: '',
-          date: '',
-        },
-      };
       const TEAM_STYLE_SAFE_DEFAULT = {
         source: 'override',
         team_a: {
@@ -3998,18 +4012,21 @@
           second_text: '#181818',
         },
       };
-      const SESSION_NAME_LIBRARY_SAFE_DEFAULT = {
-        seasons: [],
-        competitions: [],
-        teams: [],
-        training_modes: [],
-      };
       const evts = new Map(), selIds = new Set();
       const typeMarks = new Set();
       const FLT = { event: '', labels: '', period: '', start: '', end: '', dur: '' };
       let periods = [];
       let tlIgnoreNextClick = false;
       let sessionNamingLibrary = JSON.parse(JSON.stringify(SESSION_NAME_LIBRARY_SAFE_DEFAULT));
+      function saveSessionNamingLibraryStorage() {
+        try {
+          setStoredValue(SESSION_NAME_LIBRARY_KEY, JSON.stringify(normalizeSessionNamingLibrary(sessionNamingLibrary)), LEGACY_SESSION_NAME_LIBRARY_KEY);
+        } catch (_) { }
+      }
+      function setSessionNamingLibrary(raw, opts) {
+        sessionNamingLibrary = normalizeSessionNamingLibrary(raw);
+        if (!opts || opts.persist !== false) saveSessionNamingLibraryStorage();
+      }
       const T = {
         pages: [],
         tags: new Map(),
@@ -4139,21 +4156,9 @@
       // utils
       const s2d = s => new Date(Math.max(0, +s) * MS);
       const d2s = d => (d instanceof Date ? d.getTime() : new Date(d).getTime()) / MS;
-      const r1 = v => Math.round(+v * 10) / 10;
-      const r3 = v => +(+v || 0).toFixed(3);
-      const p2 = n => String(Math.max(0, Math.trunc(+n))).padStart(2, '0');
-      const fmt = s => { s = Math.max(0, +s || 0); return `${p2(s / 3600)}:${p2((s % 3600) / 60)}:${p2(s % 60)}`; };
-      const fmtMS = s => {
-        s = Math.max(0, +s || 0);
-        const mm = Math.floor(s / 60);
-        const ss = Math.floor(s % 60);
-        return `${String(mm).padStart(2, '0')}:${p2(ss)}`;
-      };
-      const fms = s => (+s).toFixed(3);
       const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const rgb = (r, g, b) => `rgb(${r},${g},${b})`;
       const dclone = obj => JSON.parse(JSON.stringify(obj ?? {}));
-      const clamp = (v, a, b) => Math.max(a, Math.min(b, +v || 0));
       const getStoredValue = (key, legacyKey, fallback = '') => {
         try {
           const current = localStorage.getItem(key);
@@ -4202,11 +4207,6 @@
         try { tl?.setOptions({ moveable: !locked && !SYNC.preview }); } catch (_) { }
       }
       let eventRowSecondaryClickUntil = 0;
-      const PITCH_XY_LEGACY_LABEL_GROUP = 'pitch_xy';
-      const PITCH_X_LABEL_GROUP = 'X';
-      const PITCH_Y_LABEL_GROUP = 'Y';
-      const PITCH_X2_LABEL_GROUP = 'X2';
-      const PITCH_Y2_LABEL_GROUP = 'Y2';
       const XY_TRAJECTORY_MIN_DISTANCE = 10;
       const SVG_NS = 'http://www.w3.org/2000/svg';
       function boolish(v, fallback) {
@@ -4218,137 +4218,6 @@
         if (s === '1' || s === 'true' || s === 'yes' || s === 'on') return true;
         if (s === '0' || s === 'false' || s === 'no' || s === 'off') return false;
         return !!fallback;
-      }
-      function normalizePitchXY(raw) {
-        if (!raw || typeof raw !== 'object') return null;
-        const x = Number(raw.x);
-        const y = Number(raw.y);
-        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-        const out = {
-          x: Number(x.toFixed(3)),
-          y: Number(y.toFixed(3)),
-        };
-        const xn = Number(raw.x_norm);
-        const yn = Number(raw.y_norm);
-        if (Number.isFinite(xn)) out.x_norm = Number(clamp(xn, 0, 1).toFixed(6));
-        if (Number.isFinite(yn)) out.y_norm = Number(clamp(yn, 0, 1).toFixed(6));
-        const x2 = Number(raw.x2);
-        const y2 = Number(raw.y2);
-        if (Number.isFinite(x2) && Number.isFinite(y2)) {
-          out.x2 = Number(x2.toFixed(3));
-          out.y2 = Number(y2.toFixed(3));
-          const x2n = Number(raw.x2_norm);
-          const y2n = Number(raw.y2_norm);
-          if (Number.isFinite(x2n)) out.x2_norm = Number(clamp(x2n, 0, 1).toFixed(6));
-          if (Number.isFinite(y2n)) out.y2_norm = Number(clamp(y2n, 0, 1).toFixed(6));
-        }
-        const cw = Number(raw.canvas_width);
-        const ch = Number(raw.canvas_height);
-        if (Number.isFinite(cw) && cw > 0) out.canvas_width = Number(cw.toFixed(3));
-        if (Number.isFinite(ch) && ch > 0) out.canvas_height = Number(ch.toFixed(3));
-        const pageIndex = Number(raw.page_index);
-        if (Number.isFinite(pageIndex)) out.page_index = Math.round(pageIndex);
-        const pageName = String(raw.page_name || '').trim();
-        if (pageName) out.page_name = pageName;
-        return out;
-      }
-      function normalizeEventLabelEntry(raw) {
-        if (typeof raw === 'string') {
-          const text = raw.trim();
-          return text ? { text } : null;
-        }
-        if (!raw || typeof raw !== 'object') return null;
-        const text = String(raw.text ?? raw.label ?? raw['label-text'] ?? '').trim();
-        if (!text) return null;
-        const group = String(raw.group ?? raw['label-group'] ?? '').trim();
-        return group ? { text, group } : { text };
-      }
-      function serializeEventLabels(labels) {
-        const out = [];
-        (Array.isArray(labels) ? labels : []).forEach(raw => {
-          const next = normalizeEventLabelEntry(raw);
-          if (next) out.push(next);
-        });
-        return out;
-      }
-      function eventLabelDisplayText(raw) {
-        const lbl = normalizeEventLabelEntry(raw);
-        if (!lbl) return '';
-        const group = String(lbl.group || '').trim();
-        return group ? `${group}: ${lbl.text}` : lbl.text;
-      }
-      function pitchXYLabelText(pitch) {
-        const p = normalizePitchXY(pitch);
-        if (!p) return '';
-        const base = `XY(${p.x.toFixed(1)},${p.y.toFixed(1)})`;
-        return pitchHasTrajectory(p) ? `${base}->(${p.x2.toFixed(1)},${p.y2.toFixed(1)})` : base;
-      }
-      function pitchHasTrajectory(pitch) {
-        const p = normalizePitchXY(pitch);
-        return !!(p && Number.isFinite(+p.x2) && Number.isFinite(+p.y2));
-      }
-      function isPitchXYLabelText(text) {
-        return /^xy\(\s*-?\d+(?:\.\d+)?,\s*-?\d+(?:\.\d+)?\s*\)$/i.test(String(text || '').trim());
-      }
-      function isPitchCoordinateLabel(raw) {
-        const lbl = normalizeEventLabelEntry(raw);
-        if (!lbl) return false;
-        const group = String(lbl.group || '').trim().toLowerCase();
-        return group === PITCH_X_LABEL_GROUP.toLowerCase()
-          || group === PITCH_Y_LABEL_GROUP.toLowerCase()
-          || group === PITCH_X2_LABEL_GROUP.toLowerCase()
-          || group === PITCH_Y2_LABEL_GROUP.toLowerCase()
-          || group === PITCH_XY_LEGACY_LABEL_GROUP
-          || isPitchXYLabelText(lbl.text);
-      }
-      function pitchXYPercentText(pitch, axis) {
-        const p = normalizePitchXY(pitch);
-        if (!p) return '';
-        const isX = axis === 'x' || axis === 'x2';
-        const isEnd = axis === 'x2' || axis === 'y2';
-        let norm = Number(isEnd ? (isX ? p.x2_norm : p.y2_norm) : (isX ? p.x_norm : p.y_norm));
-        if (!Number.isFinite(norm)) {
-          const pos = Number(isEnd ? (isX ? p.x2 : p.y2) : (isX ? p.x : p.y));
-          const size = Number(isX ? p.canvas_width : p.canvas_height);
-          if (!Number.isFinite(pos) || !Number.isFinite(size) || size <= 0) return '';
-          norm = clamp(pos / size, 0, 1);
-        }
-        return (clamp(norm, 0, 1) * 100).toFixed(2);
-      }
-      function pitchXYGroupedLabels(pitch) {
-        const x = pitchXYPercentText(pitch, 'x');
-        const y = pitchXYPercentText(pitch, 'y');
-        const x2 = pitchXYPercentText(pitch, 'x2');
-        const y2 = pitchXYPercentText(pitch, 'y2');
-        const out = [];
-        if (x) out.push({ text: x, group: PITCH_X_LABEL_GROUP });
-        if (y) out.push({ text: y, group: PITCH_Y_LABEL_GROUP });
-        if (x2) out.push({ text: x2, group: PITCH_X2_LABEL_GROUP });
-        if (y2) out.push({ text: y2, group: PITCH_Y2_LABEL_GROUP });
-        return out;
-      }
-      function syncEventPitchXYLabel(ev) {
-        if (!ev || typeof ev !== 'object') return;
-        const pitch = normalizePitchXY(ev.pitch_xy);
-        ev.pitch_xy = pitch;
-        const next = serializeEventLabels(ev.labels).filter(lbl => {
-          const group = String(lbl.group || '').trim().toLowerCase();
-          if (!pitch) return true;
-          if (group === PITCH_XY_LEGACY_LABEL_GROUP) return false;
-          if (group === PITCH_X_LABEL_GROUP.toLowerCase() || group === PITCH_Y_LABEL_GROUP.toLowerCase()) return false;
-          if (group === PITCH_X2_LABEL_GROUP.toLowerCase() || group === PITCH_Y2_LABEL_GROUP.toLowerCase()) return false;
-          return !isPitchXYLabelText(lbl.text);
-        });
-        ev.labels = pitch ? [...pitchXYGroupedLabels(pitch), ...next] : next;
-      }
-      function rgbToHex(r, g, b) {
-        const c = n => Math.max(0, Math.min(255, Math.round(+n || 0))).toString(16).padStart(2, '0');
-        return `#${c(r)}${c(g)}${c(b)}`;
-      }
-      function hexToRgb(hex) {
-        const h = String(hex || '').trim().replace('#', '');
-        if (!/^[0-9a-fA-F]{6}$/.test(h)) return [38, 79, 130];
-        return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
       }
       let stHudTimer = 0;
       const ST_HUD_DELAY = 3000;
@@ -4421,209 +4290,6 @@
         const t = cleanName(v || 'project').replace(/\.[A-Za-z0-9]{1,8}$/, '');
         const s = t.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
         return s || 'project';
-      }
-      function sanitizeProjectName(v) {
-        const raw = String(v ?? '').trim();
-        if (!raw) return '';
-        return raw.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/\s+/g, ' ').trim();
-      }
-      const SESSION_NAME_MODE_COMPETITION = 'competition';
-      const SESSION_NAME_MODE_TRAINING = 'training';
-      const SESSION_NAME_ORDER_SLOTS = 6;
-      const SESSION_NAME_SEPARATOR_OPTIONS = [' - ', '_', ' | ', ' '];
-      function sessionNamingMode(v) {
-        return String(v || '').trim().toLowerCase() === SESSION_NAME_MODE_TRAINING
-          ? SESSION_NAME_MODE_TRAINING
-          : SESSION_NAME_MODE_COMPETITION;
-      }
-      function defaultSessionNamingOrder(mode) {
-        return sessionNamingMode(mode) === SESSION_NAME_MODE_TRAINING
-          ? ['season', 'training_mode', 'day_type', 'date', 'matchup', '']
-          : ['season', 'competition', 'phase', 'matchup', '', ''];
-      }
-      function defaultSessionNaming(mode) {
-        return {
-          mode: sessionNamingMode(mode),
-          separator: ' - ',
-          order: defaultSessionNamingOrder(mode),
-          fields: {
-            season: '',
-            competition: '',
-            phase: '',
-            team_a: '',
-            team_b: '',
-            training_mode: '',
-            day_type: '',
-            date: '',
-          },
-        };
-      }
-      function normalizeSessionNamingLibraryValue(value) {
-        return sanitizeProjectName(value || '');
-      }
-      function defaultSessionNamingLibrary() {
-        return JSON.parse(JSON.stringify(SESSION_NAME_LIBRARY_SAFE_DEFAULT));
-      }
-      function normalizeSessionNamingLibrary(raw) {
-        const src = raw && typeof raw === 'object' ? raw : {};
-        const normalizeList = values => {
-          const out = [];
-          const seen = new Set();
-          (Array.isArray(values) ? values : []).forEach(value => {
-            const next = normalizeSessionNamingLibraryValue(value);
-            const key = next.toLowerCase();
-            if (!next || seen.has(key)) return;
-            seen.add(key);
-            out.push(next);
-          });
-          return out;
-        };
-        return {
-          seasons: normalizeList(src.seasons),
-          competitions: normalizeList(src.competitions),
-          teams: normalizeList(src.teams),
-          training_modes: normalizeList(src.training_modes || src.trainingModes),
-        };
-      }
-      function cloneSessionNamingLibrary(raw) {
-        return JSON.parse(JSON.stringify(normalizeSessionNamingLibrary(raw)));
-      }
-      function mergeSessionNamingLibraries(...libs) {
-        const out = defaultSessionNamingLibrary();
-        const pushAll = (key, values) => {
-          const seen = new Set(out[key].map(v => v.toLowerCase()));
-          values.forEach(value => {
-            const next = normalizeSessionNamingLibraryValue(value);
-            const id = next.toLowerCase();
-            if (!next || seen.has(id)) return;
-            seen.add(id);
-            out[key].push(next);
-          });
-        };
-        libs.forEach(lib => {
-          const next = normalizeSessionNamingLibrary(lib);
-          pushAll('seasons', next.seasons);
-          pushAll('competitions', next.competitions);
-          pushAll('teams', next.teams);
-          pushAll('training_modes', next.training_modes);
-        });
-        return out;
-      }
-      function sessionNamingLibraryFromNaming(raw) {
-        const meta = normalizeSessionNaming(raw);
-        return normalizeSessionNamingLibrary({
-          seasons: [meta.fields.season],
-          competitions: [meta.fields.competition],
-          teams: [meta.fields.team_a, meta.fields.team_b],
-          training_modes: [meta.fields.training_mode],
-        });
-      }
-      function saveSessionNamingLibraryStorage() {
-        try {
-          setStoredValue(SESSION_NAME_LIBRARY_KEY, JSON.stringify(normalizeSessionNamingLibrary(sessionNamingLibrary)), LEGACY_SESSION_NAME_LIBRARY_KEY);
-        } catch (_) { }
-      }
-      function setSessionNamingLibrary(raw, opts) {
-        sessionNamingLibrary = normalizeSessionNamingLibrary(raw);
-        if (!opts || opts.persist !== false) saveSessionNamingLibraryStorage();
-      }
-      function sessionNamingTokens(mode) {
-        const base = ['', 'season', 'team_a', 'team_b', 'matchup'];
-        if (sessionNamingMode(mode) === SESSION_NAME_MODE_TRAINING) {
-          return [...base, 'training_mode', 'day_type', 'date'];
-        }
-        return [...base, 'competition', 'phase'];
-      }
-      function normalizeSessionNamingToken(mode, token) {
-        const value = String(token || '').trim();
-        return sessionNamingTokens(mode).includes(value) ? value : '';
-      }
-      function normalizeSessionNamingDateInput(value) {
-        const raw = String(value || '').trim();
-        if (!raw) return '';
-        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-        const compact = raw.replace(/[.\-/]/g, '_');
-        return /^\d{2}_\d{2}_\d{2,4}$/.test(compact) ? compact : '';
-      }
-      function normalizeSessionNaming(raw) {
-        const mode = sessionNamingMode(raw?.mode);
-        const fallback = defaultSessionNaming(mode);
-        const fieldsRaw = raw?.fields && typeof raw.fields === 'object' ? raw.fields : raw;
-        const next = {
-          mode,
-          separator: SESSION_NAME_SEPARATOR_OPTIONS.includes(String(raw?.separator || '')) ? String(raw.separator) : fallback.separator,
-          order: fallback.order.slice(),
-          fields: { ...fallback.fields },
-        };
-        next.fields.season = sanitizeProjectName(fieldsRaw?.season || '');
-        next.fields.competition = sanitizeProjectName(fieldsRaw?.competition || '');
-        next.fields.phase = sanitizeProjectName(fieldsRaw?.phase || '');
-        next.fields.team_a = sanitizeProjectName(fieldsRaw?.team_a || fieldsRaw?.teamA || '');
-        next.fields.team_b = sanitizeProjectName(fieldsRaw?.team_b || fieldsRaw?.teamB || '');
-        next.fields.training_mode = sanitizeProjectName(fieldsRaw?.training_mode || fieldsRaw?.trainingMode || '');
-        next.fields.day_type = sanitizeProjectName(fieldsRaw?.day_type || fieldsRaw?.dayType || '');
-        next.fields.date = normalizeSessionNamingDateInput(fieldsRaw?.date || '');
-        const rawOrder = Array.isArray(raw?.order) ? raw.order.slice(0, SESSION_NAME_ORDER_SLOTS) : [];
-        const normalizedOrder = rawOrder.map(token => normalizeSessionNamingToken(mode, token));
-        if (normalizedOrder.some(Boolean)) {
-          while (normalizedOrder.length < SESSION_NAME_ORDER_SLOTS) normalizedOrder.push('');
-          next.order = normalizedOrder;
-        }
-        return next;
-      }
-      function cloneSessionNaming(raw) {
-        return JSON.parse(JSON.stringify(normalizeSessionNaming(raw)));
-      }
-      function sessionNamingDateToken(value) {
-        const raw = normalizeSessionNamingDateInput(value);
-        if (!raw) return '';
-        if (/^\d{2}_\d{2}_\d{2,4}$/.test(raw)) {
-          const parts = raw.split('_');
-          const year = parts[2].slice(-2);
-          return `${parts[0]}_${parts[1]}_${year}`;
-        }
-        const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (!match) return '';
-        return `${match[3]}_${match[2]}_${match[1].slice(-2)}`;
-      }
-      function sessionNamingTokenLabel(token) {
-        switch (String(token || '').trim()) {
-          case 'season': return 'Season';
-          case 'competition': return 'Competition / League';
-          case 'phase': return 'Phase / Game No.';
-          case 'team_a': return 'Team A';
-          case 'team_b': return 'Team B';
-          case 'matchup': return 'Matchup (A vs B)';
-          case 'training_mode': return 'Training Mode';
-          case 'day_type': return 'Day Type';
-          case 'date': return 'Date (dd_mm_yy)';
-          default: return 'Skip';
-        }
-      }
-      function sessionNamingTokenValue(raw, token) {
-        const meta = normalizeSessionNaming(raw);
-        const key = String(token || '').trim();
-        if (!key) return '';
-        if (key === 'matchup') {
-          const a = String(meta.fields.team_a || '').trim();
-          const b = String(meta.fields.team_b || '').trim();
-          if (a && b) return `${a} vs ${b}`;
-          return a || b || '';
-        }
-        if (key === 'date') return sessionNamingDateToken(meta.fields.date);
-        return String(meta.fields[key] || '').trim();
-      }
-      function sessionNamingPreview(raw) {
-        const meta = normalizeSessionNaming(raw);
-        const parts = meta.order.map(token => sessionNamingTokenValue(meta, token)).filter(Boolean);
-        return sanitizeProjectName(parts.join(meta.separator));
-      }
-      function sessionNamingResolvedProjectName(raw, fallback) {
-        return sessionNamingPreview(raw) || sanitizeProjectName(fallback) || 'Project';
-      }
-      function sessionNamingHasData(raw) {
-        const meta = normalizeSessionNaming(raw);
-        return Object.values(meta.fields).some(v => String(v || '').trim());
       }
       function teamStyleSource(value) {
         return String(value || '').trim() === 'override' ? 'override' : 'template';
@@ -7296,30 +6962,6 @@
       }
 
       // timeline re-sync
-      function parseSignedSeconds(text) {
-        if (typeof text === 'number') return Number.isFinite(text) ? text : NaN;
-        const raw = String(text || '').trim();
-        if (!raw) return NaN;
-        const sign = raw.startsWith('-') ? -1 : 1;
-        const body = raw.replace(/^[+-]\s*/, '').replace(/s$/i, '').trim();
-        if (!body) return NaN;
-        if (/^\d+(\.\d+)?$/.test(body)) return sign * (+body);
-        const parsed = parseFilterSeconds(body);
-        return Number.isFinite(parsed) ? sign * parsed : NaN;
-      }
-      function timeRoundForDelta(delta) {
-        const d = Math.abs(+delta || 0);
-        if (d < 0.0995) return r3;
-        if (Math.abs((d * 10) - Math.round(d * 10)) > 0.0005) return r3;
-        return r1;
-      }
-      function fmtSignedSeconds(sec) {
-        const s = +sec || 0;
-        const sign = s >= 0 ? '+' : '-';
-        const abs = Math.abs(s);
-        const rounded = Math.abs(abs - Math.round(abs)) < 0.0001 ? String(Math.round(abs)) : abs.toFixed(1);
-        return `${sign}${rounded}s`;
-      }
       function syncHalfKey(period) {
         return String(period?._uid ?? period?.id ?? '');
       }
@@ -7693,16 +7335,6 @@
 
       // event table
       function asText(v) { return String(v ?? '').trim(); }
-      function parseFilterSeconds(text) {
-        const raw = String(text || '').trim();
-        if (!raw) return NaN;
-        if (/^\d+(\.\d+)?$/.test(raw)) return +raw;
-        const parts = raw.split(':').map(s => s.trim()).filter(Boolean);
-        if (parts.some(p => !/^\d+(\.\d+)?$/.test(p))) return NaN;
-        if (parts.length === 2) return (+parts[0] * 60) + (+parts[1]);
-        if (parts.length === 3) return (+parts[0] * 3600) + (+parts[1] * 60) + (+parts[2]);
-        return NaN;
-      }
       function matchTextFilter(value, needle) {
         const n = asText(needle).toLowerCase();
         if (!n) return true;
@@ -8434,28 +8066,6 @@
 
       function templatePageBackgroundPath(page) {
         return String(page?.['template_page-background_image_path'] || page?.['template_page-background_image'] || page?.bg || '').trim();
-      }
-      function normalizeTemplateSchemaKeys(raw) {
-        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
-        let text = '';
-        try {
-          text = JSON.stringify(raw);
-        } catch (_) {
-          return raw;
-        }
-        const migrated = text
-          .replace(/"tagging-pages":/g, '"event-pages":')
-          .replace(/"tagging-window-items-extra-pages":/g, '"event-window-items-extra-pages":')
-          .replace(/"tagging-window-items":/g, '"event-window-items":')
-          .replace(/"tagging-window-item/g, '"event-window-item')
-          .replace(/"tagging-window-canvas_/g, '"event-window-canvas_')
-          .replace(/"tagging-window":/g, '"event-window":');
-        if (migrated === text) return raw;
-        try {
-          return JSON.parse(migrated);
-        } catch (_) {
-          return raw;
-        }
       }
       function templateItemImagePath(item) {
         return String(

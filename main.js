@@ -5,6 +5,7 @@ const fs = require('fs');
 const fsp = require('fs/promises');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
+const { normalizePitchXY, normalizeTemplateSchemaKeys } = require('./js/latchr-shared.js');
 
 const ROOT_DIR = __dirname;
 const HOME_DIR = os.homedir();
@@ -571,29 +572,6 @@ function detectJsonPayloadType(data) {
   return 'unknown';
 }
 
-function normalizeTemplateSchemaKeys(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
-  let text = '';
-  try {
-    text = JSON.stringify(raw);
-  } catch (_) {
-    return raw;
-  }
-  const migrated = text
-    .replace(/"tagging-pages":/g, '"event-pages":')
-    .replace(/"tagging-window-items-extra-pages":/g, '"event-window-items-extra-pages":')
-    .replace(/"tagging-window-items":/g, '"event-window-items":')
-    .replace(/"tagging-window-item/g, '"event-window-item')
-    .replace(/"tagging-window-canvas_/g, '"event-window-canvas_')
-    .replace(/"tagging-window":/g, '"event-window":');
-  if (migrated === text) return raw;
-  try {
-    return JSON.parse(migrated);
-  } catch (_) {
-    return raw;
-  }
-}
-
 async function detectJsonFileType(pathText) {
   const resolved = resolvePathFromRoot(pathText);
   if (path.extname(resolved).toLowerCase() !== '.json') return { ok: true, kind: 'unknown', path: resolved };
@@ -701,40 +679,6 @@ function normalizeEventLabels(labels) {
     if (group) out.push({ text, group });
     else out.push({ text });
   }
-  return out;
-}
-
-function normalizePitchXY(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-  const x = Number(raw.x);
-  const y = Number(raw.y);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-  const out = {
-    x: Number(x.toFixed(3)),
-    y: Number(y.toFixed(3)),
-  };
-  const xNorm = Number(raw.x_norm);
-  const yNorm = Number(raw.y_norm);
-  if (Number.isFinite(xNorm)) out.x_norm = Number(Math.max(0, Math.min(1, xNorm)).toFixed(6));
-  if (Number.isFinite(yNorm)) out.y_norm = Number(Math.max(0, Math.min(1, yNorm)).toFixed(6));
-  const x2 = Number(raw.x2);
-  const y2 = Number(raw.y2);
-  if (Number.isFinite(x2) && Number.isFinite(y2)) {
-    out.x2 = Number(x2.toFixed(3));
-    out.y2 = Number(y2.toFixed(3));
-    const x2Norm = Number(raw.x2_norm);
-    const y2Norm = Number(raw.y2_norm);
-    if (Number.isFinite(x2Norm)) out.x2_norm = Number(Math.max(0, Math.min(1, x2Norm)).toFixed(6));
-    if (Number.isFinite(y2Norm)) out.y2_norm = Number(Math.max(0, Math.min(1, y2Norm)).toFixed(6));
-  }
-  const canvasWidth = Number(raw.canvas_width);
-  const canvasHeight = Number(raw.canvas_height);
-  if (Number.isFinite(canvasWidth) && canvasWidth > 0) out.canvas_width = Number(canvasWidth.toFixed(3));
-  if (Number.isFinite(canvasHeight) && canvasHeight > 0) out.canvas_height = Number(canvasHeight.toFixed(3));
-  const pageIndex = Number(raw.page_index);
-  if (Number.isFinite(pageIndex)) out.page_index = Math.round(pageIndex);
-  const pageName = String(raw.page_name || '').trim();
-  if (pageName) out.page_name = pageName;
   return out;
 }
 

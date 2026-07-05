@@ -302,6 +302,7 @@ function buildRuntimeStage(pkg) {
   // Optional runtime assets.
   copyIfExists(path.join(ROOT, 'styles.css'), path.join(STAGE_DIR, 'styles.css'));
   copyIfExists(path.join(ROOT, 'assets'), path.join(STAGE_DIR, 'assets'));
+  copyIfExists(path.join(ROOT, 'js'), path.join(STAGE_DIR, 'js'));
   bundleFfmpegRuntime(STAGE_DIR);
 
   const runtimePackage = {

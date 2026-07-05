@@ -52,6 +52,9 @@ function main() {
   parseJSON('package.json');
   parseJS('main.js');
   parseJS('preload.js');
+  for (const entry of fs.readdirSync(path.join(root, 'js'))) {
+    if (entry.endsWith('.js')) parseJS(path.join('js', entry));
+  }
   parseInlineScriptFromHTML('index.html');
 
   // Optional baseline data file check (if present)

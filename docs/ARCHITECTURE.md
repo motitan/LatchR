@@ -13,6 +13,13 @@ LatchR is an Electron desktop app with:
 - `main.js`
 - `preload.js`
 - `index.html`
+- `js/latchr-*.js` — extracted pure-logic modules (UMD-style): `shared`
+  (pitch XY + template schema migration + color hex, used by both
+  processes), `time` (formatting/parsing), `labels` (event/pitch labels),
+  `naming` (session naming + library). Loaded by the renderer as globals
+  (`LatchRShared`, `LatchRTime`, `LatchRLabels`, `LatchRNaming`), by
+  `main.js` via `require`, and unit-tested under `test/` with `node --test`.
+  Keep these modules free of DOM, Electron, and storage dependencies.
 - `styles.css` (legacy)
 
 Historical prototypes are kept under `legacy/` and are not runtime entrypoints.

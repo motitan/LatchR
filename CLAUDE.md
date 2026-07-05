@@ -10,19 +10,21 @@ LatchR is an Electron desktop app for sports video tagging: video playback synce
 
 ```bash
 npm install
-npm run check        # syntax/JSON validation of main.js, preload.js, index.html inline script — this is CI; there are no unit tests
+npm run check        # syntax/JSON validation of main.js, preload.js, js/*.js, index.html inline script
+npm test             # node --test test/ — unit tests for the extracted js/ modules; CI runs check + test
 npm start            # run the app locally (electron .)
-npm run package:mac      # build dist/LatchR.app (bundles Electron, vis-timeline, ffmpeg/ffprobe)
+npm run package:mac      # build dist/LatchR.app (bundles Electron, vis-timeline, ffmpeg/ffprobe, js/)
 npm run package:mac:zip  # also produce release/LatchR-macOS-v<version>.zip
 ```
 
 ## Architecture
 
-Three canonical runtime files — there is no bundler or framework:
+Canonical runtime files — there is no bundler or framework:
 
-- `main.js` (~3900 lines) — main process. ALL filesystem access, ffmpeg/ffprobe invocation, dialogs, and IPC handlers live here. ffmpeg is resolved from a candidate list (bundled `bin/ffmpeg`, `~/LatchR/bin`, Homebrew paths, PATH).
+- `main.js` (~3700 lines) — main process. ALL filesystem access, ffmpeg/ffprobe invocation, dialogs, and IPC handlers live here. ffmpeg is resolved from a candidate list (bundled `bin/ffmpeg`, `~/LatchR/bin`, Homebrew paths, PATH).
 - `preload.js` — context bridge exposing the whole API as `window.latchrAPI` (plus legacy alias `sportTaggerAPI`).
-- `index.html` (~13500 lines) — the entire renderer: UI markup, CSS, and all interaction logic in one inline `<script>` block. `npm run check` parses this inline script, so it must remain a single valid script block.
+- `index.html` (~13000 lines) — the renderer: UI markup, CSS, and interaction logic in one inline `<script>` block. `npm run check` parses this inline script, so it must remain a single valid script block.
+- `js/latchr-{shared,time,labels,naming}.js` — extracted pure logic in UMD-style modules, loaded by the renderer via `<script src>` (globals `LatchRShared`, `LatchRTime`, `LatchRLabels`, `LatchRNaming`), by `main.js` via `require` (shared module), and by the tests. New pure logic goes here, not into the inline script; keep these modules free of DOM/Electron dependencies.
 
 Not runtime code: `styles.css` (legacy stylesheet), `legacy/` (historical prototypes), `server.py` (older browser-based server mode), `Launch LatchR.command` (end-user launcher fallback).
 
@@ -46,7 +48,7 @@ Keep timeline rendering centralized — route updates through the single refresh
 
 ## Verification expectations
 
-Before submitting: `npm run check` passes, `npm start` launches, and the changed workflow is smoke-tested end-to-end. Commit style: `feat:` / `fix:` / `docs:` / `refactor:`.
+Before submitting: `npm run check` and `npm test` pass, `npm start` launches, and the changed workflow is smoke-tested end-to-end. Commit style: `feat:` / `fix:` / `docs:` / `refactor:`.
 
 ## Releasing
 
