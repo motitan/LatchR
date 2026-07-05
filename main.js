@@ -159,18 +159,11 @@ function preferredProjectDirForSave(currentProjectDir, projectName) {
   if (isInsideDir(LEGACY_TAGGER_PROJECTS_DIR, currentDir)) {
     return path.join(LATCHR_PROJECTS_DIR, projectPackageDirName(projectName));
   }
-  if (isInsideDir(LATCHR_PROJECTS_DIR, currentDir) || isProjectPackageDirName(path.basename(currentDir))) {
-    return path.join(path.dirname(currentDir), projectPackageDirName(projectName));
-  }
   return path.join(path.dirname(currentDir), projectPackageDirName(projectName));
 }
 
 function schemaId(name) {
   return `${PROJECT_SCHEMA_PREFIX}.${name}`;
-}
-
-function legacySchemaId(name) {
-  return `${LEGACY_PROJECT_SCHEMA_PREFIX}.${name}`;
 }
 
 function sanitizeName(value, fallback = 'clip') {
@@ -2688,40 +2681,6 @@ function buildClipEncodeArgs(sourceVideo, startSec, endSec, outputPath) {
   ];
 }
 
-function buildClipEdgeEncodeArgs(sourceVideo, startSec, endSec, outputPath) {
-  const durationSec = Math.max(0.001, endSec - startSec);
-  return [
-    '-y',
-    '-ss',
-    startSec.toFixed(6),
-    '-i',
-    sourceVideo,
-    '-t',
-    durationSec.toFixed(6),
-    '-map',
-    '0:v:0',
-    '-map',
-    '0:a?',
-    '-c:v',
-    'libx264',
-    '-preset',
-    'veryfast',
-    '-crf',
-    '18',
-    '-bf',
-    '0',
-    '-pix_fmt',
-    'yuv420p',
-    '-c:a',
-    'copy',
-    '-movflags',
-    '+faststart',
-    '-avoid_negative_ts',
-    'make_zero',
-    outputPath,
-  ];
-}
-
 function buildClipCopyArgs(sourceVideo, startSec, endSec, outputPath) {
   const durationSec = Math.max(0.001, endSec - startSec);
   return [
@@ -2754,82 +2713,6 @@ async function runClipStandardEncode(ffmpegPath, sourceVideo, startSec, endSec, 
     args,
     error: ok ? '' : tailText(run.stderr || run.stdout || run.error || 'ffmpeg failed'),
   };
-}
-
-async function probeVideoKeyframeTimes(ffprobePath, sourceVideo) {
-  if (!ffprobePath || !sourceVideo) {
-    return { ok: false, error: 'ffprobe path and source video are required', times: [] };
-  }
-  const out = await runCommand(ffprobePath, [
-    '-v',
-    'error',
-    '-select_streams',
-    'v:0',
-    '-skip_frame',
-    'nokey',
-    '-show_frames',
-    '-show_entries',
-    'frame=best_effort_timestamp_time,pkt_pts_time,pkt_dts_time',
-    '-of',
-    'json',
-    sourceVideo,
-  ]);
-  if (out.code !== 0) {
-    return { ok: false, error: tailText(out.stderr || out.stdout || out.error || 'ffprobe keyframe probe failed'), times: [] };
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(String(out.stdout || '{}'));
-  } catch (error) {
-    return {
-      ok: false,
-      error: `ffprobe keyframe JSON parse error: ${String(error && error.message ? error.message : error)}`,
-      times: [],
-    };
-  }
-
-  const frames = Array.isArray(parsed.frames) ? parsed.frames : [];
-  const times = [];
-  for (const frame of frames) {
-    const t = numberOrNull(
-      frame && (
-        frame.best_effort_timestamp_time
-        || frame.pkt_pts_time
-        || frame.pkt_dts_time
-      ),
-      { nonNegative: true },
-    );
-    if (t !== null) times.push(t);
-  }
-  times.sort((a, b) => a - b);
-  const uniq = [];
-  for (const t of times) {
-    if (!uniq.length || Math.abs(t - uniq[uniq.length - 1]) > 0.0005) {
-      uniq.push(t);
-    }
-  }
-  return { ok: true, times: uniq, count: uniq.length };
-}
-
-function firstKeyframeAtOrAfter(times, sec) {
-  const list = Array.isArray(times) ? times : [];
-  const target = Number(sec);
-  if (!list.length || !Number.isFinite(target)) return NaN;
-  let lo = 0;
-  let hi = list.length - 1;
-  let ans = NaN;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    const cur = Number(list[mid]);
-    if (cur + 0.000001 >= target) {
-      ans = cur;
-      hi = mid - 1;
-    } else {
-      lo = mid + 1;
-    }
-  }
-  return ans;
 }
 
 function lastKeyframeAtOrBefore(times, sec) {
