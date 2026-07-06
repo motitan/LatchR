@@ -5,6 +5,7 @@ const fs = require('fs');
 const fsp = require('fs/promises');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
+const { normalizePitchXY, normalizeTemplateSchemaKeys } = require('./js/latchr-shared.js');
 
 const ROOT_DIR = __dirname;
 const HOME_DIR = os.homedir();
@@ -159,18 +160,11 @@ function preferredProjectDirForSave(currentProjectDir, projectName) {
   if (isInsideDir(LEGACY_TAGGER_PROJECTS_DIR, currentDir)) {
     return path.join(LATCHR_PROJECTS_DIR, projectPackageDirName(projectName));
   }
-  if (isInsideDir(LATCHR_PROJECTS_DIR, currentDir) || isProjectPackageDirName(path.basename(currentDir))) {
-    return path.join(path.dirname(currentDir), projectPackageDirName(projectName));
-  }
   return path.join(path.dirname(currentDir), projectPackageDirName(projectName));
 }
 
 function schemaId(name) {
   return `${PROJECT_SCHEMA_PREFIX}.${name}`;
-}
-
-function legacySchemaId(name) {
-  return `${LEGACY_PROJECT_SCHEMA_PREFIX}.${name}`;
 }
 
 function sanitizeName(value, fallback = 'clip') {
@@ -578,29 +572,6 @@ function detectJsonPayloadType(data) {
   return 'unknown';
 }
 
-function normalizeTemplateSchemaKeys(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
-  let text = '';
-  try {
-    text = JSON.stringify(raw);
-  } catch (_) {
-    return raw;
-  }
-  const migrated = text
-    .replace(/"tagging-pages":/g, '"event-pages":')
-    .replace(/"tagging-window-items-extra-pages":/g, '"event-window-items-extra-pages":')
-    .replace(/"tagging-window-items":/g, '"event-window-items":')
-    .replace(/"tagging-window-item/g, '"event-window-item')
-    .replace(/"tagging-window-canvas_/g, '"event-window-canvas_')
-    .replace(/"tagging-window":/g, '"event-window":');
-  if (migrated === text) return raw;
-  try {
-    return JSON.parse(migrated);
-  } catch (_) {
-    return raw;
-  }
-}
-
 async function detectJsonFileType(pathText) {
   const resolved = resolvePathFromRoot(pathText);
   if (path.extname(resolved).toLowerCase() !== '.json') return { ok: true, kind: 'unknown', path: resolved };
@@ -708,40 +679,6 @@ function normalizeEventLabels(labels) {
     if (group) out.push({ text, group });
     else out.push({ text });
   }
-  return out;
-}
-
-function normalizePitchXY(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-  const x = Number(raw.x);
-  const y = Number(raw.y);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-  const out = {
-    x: Number(x.toFixed(3)),
-    y: Number(y.toFixed(3)),
-  };
-  const xNorm = Number(raw.x_norm);
-  const yNorm = Number(raw.y_norm);
-  if (Number.isFinite(xNorm)) out.x_norm = Number(Math.max(0, Math.min(1, xNorm)).toFixed(6));
-  if (Number.isFinite(yNorm)) out.y_norm = Number(Math.max(0, Math.min(1, yNorm)).toFixed(6));
-  const x2 = Number(raw.x2);
-  const y2 = Number(raw.y2);
-  if (Number.isFinite(x2) && Number.isFinite(y2)) {
-    out.x2 = Number(x2.toFixed(3));
-    out.y2 = Number(y2.toFixed(3));
-    const x2Norm = Number(raw.x2_norm);
-    const y2Norm = Number(raw.y2_norm);
-    if (Number.isFinite(x2Norm)) out.x2_norm = Number(Math.max(0, Math.min(1, x2Norm)).toFixed(6));
-    if (Number.isFinite(y2Norm)) out.y2_norm = Number(Math.max(0, Math.min(1, y2Norm)).toFixed(6));
-  }
-  const canvasWidth = Number(raw.canvas_width);
-  const canvasHeight = Number(raw.canvas_height);
-  if (Number.isFinite(canvasWidth) && canvasWidth > 0) out.canvas_width = Number(canvasWidth.toFixed(3));
-  if (Number.isFinite(canvasHeight) && canvasHeight > 0) out.canvas_height = Number(canvasHeight.toFixed(3));
-  const pageIndex = Number(raw.page_index);
-  if (Number.isFinite(pageIndex)) out.page_index = Math.round(pageIndex);
-  const pageName = String(raw.page_name || '').trim();
-  if (pageName) out.page_name = pageName;
   return out;
 }
 
@@ -1954,12 +1891,12 @@ async function probeReadableDurationSec(ffmpegPath, sourceVideo) {
     '0:a?',
     '-c',
     'copy',
-    '-f',
-    'null',
-    '-',
     '-progress',
     'pipe:1',
     '-nostats',
+    '-f',
+    'null',
+    '-',
   ], NaN, null);
   const outSec = Number(run && run.out_sec);
   return {
@@ -2688,40 +2625,6 @@ function buildClipEncodeArgs(sourceVideo, startSec, endSec, outputPath) {
   ];
 }
 
-function buildClipEdgeEncodeArgs(sourceVideo, startSec, endSec, outputPath) {
-  const durationSec = Math.max(0.001, endSec - startSec);
-  return [
-    '-y',
-    '-ss',
-    startSec.toFixed(6),
-    '-i',
-    sourceVideo,
-    '-t',
-    durationSec.toFixed(6),
-    '-map',
-    '0:v:0',
-    '-map',
-    '0:a?',
-    '-c:v',
-    'libx264',
-    '-preset',
-    'veryfast',
-    '-crf',
-    '18',
-    '-bf',
-    '0',
-    '-pix_fmt',
-    'yuv420p',
-    '-c:a',
-    'copy',
-    '-movflags',
-    '+faststart',
-    '-avoid_negative_ts',
-    'make_zero',
-    outputPath,
-  ];
-}
-
 function buildClipCopyArgs(sourceVideo, startSec, endSec, outputPath) {
   const durationSec = Math.max(0.001, endSec - startSec);
   return [
@@ -2754,82 +2657,6 @@ async function runClipStandardEncode(ffmpegPath, sourceVideo, startSec, endSec, 
     args,
     error: ok ? '' : tailText(run.stderr || run.stdout || run.error || 'ffmpeg failed'),
   };
-}
-
-async function probeVideoKeyframeTimes(ffprobePath, sourceVideo) {
-  if (!ffprobePath || !sourceVideo) {
-    return { ok: false, error: 'ffprobe path and source video are required', times: [] };
-  }
-  const out = await runCommand(ffprobePath, [
-    '-v',
-    'error',
-    '-select_streams',
-    'v:0',
-    '-skip_frame',
-    'nokey',
-    '-show_frames',
-    '-show_entries',
-    'frame=best_effort_timestamp_time,pkt_pts_time,pkt_dts_time',
-    '-of',
-    'json',
-    sourceVideo,
-  ]);
-  if (out.code !== 0) {
-    return { ok: false, error: tailText(out.stderr || out.stdout || out.error || 'ffprobe keyframe probe failed'), times: [] };
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(String(out.stdout || '{}'));
-  } catch (error) {
-    return {
-      ok: false,
-      error: `ffprobe keyframe JSON parse error: ${String(error && error.message ? error.message : error)}`,
-      times: [],
-    };
-  }
-
-  const frames = Array.isArray(parsed.frames) ? parsed.frames : [];
-  const times = [];
-  for (const frame of frames) {
-    const t = numberOrNull(
-      frame && (
-        frame.best_effort_timestamp_time
-        || frame.pkt_pts_time
-        || frame.pkt_dts_time
-      ),
-      { nonNegative: true },
-    );
-    if (t !== null) times.push(t);
-  }
-  times.sort((a, b) => a - b);
-  const uniq = [];
-  for (const t of times) {
-    if (!uniq.length || Math.abs(t - uniq[uniq.length - 1]) > 0.0005) {
-      uniq.push(t);
-    }
-  }
-  return { ok: true, times: uniq, count: uniq.length };
-}
-
-function firstKeyframeAtOrAfter(times, sec) {
-  const list = Array.isArray(times) ? times : [];
-  const target = Number(sec);
-  if (!list.length || !Number.isFinite(target)) return NaN;
-  let lo = 0;
-  let hi = list.length - 1;
-  let ans = NaN;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    const cur = Number(list[mid]);
-    if (cur + 0.000001 >= target) {
-      ans = cur;
-      hi = mid - 1;
-    } else {
-      lo = mid + 1;
-    }
-  }
-  return ans;
 }
 
 function lastKeyframeAtOrBefore(times, sec) {
@@ -3026,6 +2853,10 @@ async function prepareSmartRenderContext(ffmpegPath, sourceVideo) {
 
 function ffconcatPath(pathText) {
   return String(pathText || '').replace(/\\/g, '/').replace(/'/g, "'\\''");
+}
+
+function shSingleQuote(text) {
+  return `'${String(text || '').replace(/'/g, `'\\''`)}'`;
 }
 
 function exportOutputDirForVideo(sourceVideo, videoNameRaw) {
@@ -3312,8 +3143,8 @@ async function handleExportClips(payload) {
   const shLines = [
     '#!/usr/bin/env bash',
     'set -euo pipefail',
-    `INPUT="${sourceVideo.replace(/"/g, '\\"')}"`,
-    `FFMPEG="${String(ff.ffmpeg || 'ffmpeg').replace(/"/g, '\\"')}"`,
+    `INPUT=${shSingleQuote(sourceVideo)}`,
+    `FFMPEG=${shSingleQuote(String(ff.ffmpeg || 'ffmpeg'))}`,
     'OUT_DIR="$(cd "$(dirname "$0")" && pwd)"',
     '',
   ];
@@ -3405,89 +3236,91 @@ async function handleExportMerged(payload) {
   await fsp.mkdir(mergeTmpDir, { recursive: true });
   const partFiles = [];
 
-  for (let i = 0; i < jobs.length; i += 1) {
-    const job = jobs[i];
-    const partName = `part_${String(i + 1).padStart(3, '0')}.mp4`;
-    const partPath = path.join(mergeTmpDir, partName);
-    const args = buildClipEncodeArgs(sourceVideo, job.startSec, job.endSec, partPath);
-    const run = await runCommand(ff.ffmpeg, args);
-    if (run.code === 0 && fs.existsSync(partPath)) {
-      partFiles.push(partPath);
-    } else {
-      failed.push({
-        clip: job.clipNum,
-        name: job.fileStem,
-        tag: job.tagSlug,
-        error: tailText(run.stderr || run.stdout || run.error || 'ffmpeg failed'),
-      });
+  try {
+    for (let i = 0; i < jobs.length; i += 1) {
+      const job = jobs[i];
+      const partName = `part_${String(i + 1).padStart(3, '0')}.mp4`;
+      const partPath = path.join(mergeTmpDir, partName);
+      const args = buildClipEncodeArgs(sourceVideo, job.startSec, job.endSec, partPath);
+      const run = await runCommand(ff.ffmpeg, args);
+      if (run.code === 0 && fs.existsSync(partPath)) {
+        partFiles.push(partPath);
+      } else {
+        failed.push({
+          clip: job.clipNum,
+          name: job.fileStem,
+          tag: job.tagSlug,
+          error: tailText(run.stderr || run.stdout || run.error || 'ffmpeg failed'),
+        });
+      }
     }
-  }
 
-  if (!partFiles.length) {
+    if (!partFiles.length) {
+      return {
+        ok: false,
+        error: 'Could not render clip segments for merge',
+        output_dir: outDir,
+        failed: failed.length,
+        errors: failed,
+        ffmpeg: ff.ffmpeg,
+      };
+    }
+    if (failed.length) {
+      return {
+        ok: false,
+        error: `Could not render all segments for merge (${failed.length} failed)`,
+        output_dir: outDir,
+        created_parts: partFiles.length,
+        failed: failed.length,
+        errors: failed,
+        ffmpeg: ff.ffmpeg,
+      };
+    }
+
+    const outputStem = sanitizeName(payload && payload.output_name ? payload.output_name : 'merged', 'merged')
+      .replace(/\.mp4$/i, '');
+    const mergedPath = uniquePathIfExists(path.join(outDir, `${outputStem}.mp4`));
+    const concatListPath = path.join(mergeTmpDir, 'concat_list.txt');
+    const concatLines = partFiles.map((partPath) => `file '${ffconcatPath(partPath)}'`);
+    await fsp.writeFile(concatListPath, `${concatLines.join('\n')}\n`, 'utf8');
+
+    const mergeArgs = [
+      '-y',
+      '-f',
+      'concat',
+      '-safe',
+      '0',
+      '-i',
+      concatListPath,
+      '-c',
+      'copy',
+      '-movflags',
+      '+faststart',
+      mergedPath,
+    ];
+    const mergedRun = await runCommand(ff.ffmpeg, mergeArgs);
+    if (mergedRun.code !== 0 || !fs.existsSync(mergedPath)) {
+      return {
+        ok: false,
+        error: tailText(mergedRun.stderr || mergedRun.stdout || mergedRun.error || 'ffmpeg merge failed'),
+        output_dir: outDir,
+        ffmpeg: ff.ffmpeg,
+      };
+    }
+
     return {
-      ok: false,
-      error: 'Could not render clip segments for merge',
+      ok: true,
+      mode: 'merged',
+      source_video: sourceVideo,
       output_dir: outDir,
-      failed: failed.length,
-      errors: failed,
-      ffmpeg: ff.ffmpeg,
-    };
-  }
-  if (failed.length) {
-    return {
-      ok: false,
-      error: `Could not render all segments for merge (${failed.length} failed)`,
-      output_dir: outDir,
+      output_file: mergedPath,
       created_parts: partFiles.length,
-      failed: failed.length,
-      errors: failed,
+      failed: 0,
       ffmpeg: ff.ffmpeg,
     };
+  } finally {
+    await fsp.rm(mergeTmpDir, { recursive: true, force: true }).catch(() => { });
   }
-
-  const outputStem = sanitizeName(payload && payload.output_name ? payload.output_name : 'merged', 'merged')
-    .replace(/\.mp4$/i, '');
-  const mergedPath = uniquePathIfExists(path.join(outDir, `${outputStem}.mp4`));
-  const concatListPath = path.join(mergeTmpDir, 'concat_list.txt');
-  const concatLines = partFiles.map((partPath) => `file '${ffconcatPath(partPath)}'`);
-  await fsp.writeFile(concatListPath, `${concatLines.join('\n')}\n`, 'utf8');
-
-  const mergeArgs = [
-    '-y',
-    '-f',
-    'concat',
-    '-safe',
-    '0',
-    '-i',
-    concatListPath,
-    '-c',
-    'copy',
-    '-movflags',
-    '+faststart',
-    mergedPath,
-  ];
-  const mergedRun = await runCommand(ff.ffmpeg, mergeArgs);
-  if (mergedRun.code !== 0 || !fs.existsSync(mergedPath)) {
-    return {
-      ok: false,
-      error: tailText(mergedRun.stderr || mergedRun.stdout || mergedRun.error || 'ffmpeg merge failed'),
-      output_dir: outDir,
-      ffmpeg: ff.ffmpeg,
-    };
-  }
-
-  await fsp.rm(mergeTmpDir, { recursive: true, force: true }).catch(() => { });
-
-  return {
-    ok: true,
-    mode: 'merged',
-    source_video: sourceVideo,
-    output_dir: outDir,
-    output_file: mergedPath,
-    created_parts: partFiles.length,
-    failed: 0,
-    ffmpeg: ff.ffmpeg,
-  };
 }
 
 async function handleConvertVideoMp4(payload, onProgress) {
@@ -3660,6 +3493,7 @@ async function handleConvertVideoMp4(payload, onProgress) {
   let retriedSafe = false;
   let run = await runConvertAttempt(false);
   if (run.code !== 0 || !fs.existsSync(outputPath)) {
+    await fsp.rm(outputPath, { force: true }).catch(() => { });
     return {
       ok: false,
       error: tailText(run.stderr || run.stdout || run.error || 'ffmpeg conversion failed'),
@@ -3686,6 +3520,7 @@ async function handleConvertVideoMp4(payload, onProgress) {
     } catch (_) { }
     run = await runConvertAttempt(true);
     if (run.code !== 0 || !fs.existsSync(outputPath)) {
+      await fsp.rm(outputPath, { force: true }).catch(() => { });
       return {
         ok: false,
         error: tailText(run.stderr || run.stdout || run.error || 'ffmpeg conversion failed in safe mode'),
@@ -3696,6 +3531,7 @@ async function handleConvertVideoMp4(payload, onProgress) {
     if (isLikelyTruncatedDuration(expectedDurationSec, outputDurationSec)) {
       const outputSecText = Number.isFinite(outputDurationSec) ? outputDurationSec.toFixed(1) : 'unknown';
       const expectedSecText = Number.isFinite(expectedDurationSec) ? expectedDurationSec.toFixed(1) : 'unknown';
+      await fsp.rm(outputPath, { force: true }).catch(() => { });
       return {
         ok: false,
         error: `Converted output appears truncated (${outputSecText}s vs expected ${expectedSecText}s). Conversion aborted to protect project video.`,
